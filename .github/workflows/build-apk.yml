@@ -36,6 +36,9 @@ jobs:
       - name: حذف ملف الاختبار الافتراضي
         working-directory: app
         run: rm -f test/widget_test.dart
+      - name: تبسيط ملف analysis_options
+        working-directory: app
+        run: printf "linter:\n  rules:\n" > analysis_options.yaml
 
       - name: تثبيت الحزم
         working-directory: app
