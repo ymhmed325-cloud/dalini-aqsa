@@ -33,6 +33,9 @@ jobs:
       - name: إنشاء مجلدات المنصات (android/ios)
         working-directory: app
         run: flutter create . --platforms=android --org com.dalini.aqsa --project-name dalini_aqsa
+      - name: حذف ملف الاختبار الافتراضي
+        working-directory: app
+        run: rm -f test/widget_test.dart
 
       - name: تثبيت الحزم
         working-directory: app
