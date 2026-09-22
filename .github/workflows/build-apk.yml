@@ -39,6 +39,9 @@ jobs:
       - name: تبسيط ملف analysis_options
         working-directory: app
         run: printf "linter:\n  rules:\n" > analysis_options.yaml
+      - name: تحديث نسخة Kotlin
+        working-directory: app
+        run: sed -i "s/id \"org.jetbrains.kotlin.android\" version \"[^\"]*\"/id \"org.jetbrains.kotlin.android\" version \"1.9.24\"/" android/settings.gradle
 
       - name: تثبيت الحزم
         working-directory: app
