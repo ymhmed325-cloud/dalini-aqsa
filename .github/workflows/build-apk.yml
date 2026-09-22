@@ -30,6 +30,10 @@ jobs:
           channel: stable
           cache: true
 
+      - name: إنشاء مجلدات المنصات (android/ios)
+        working-directory: app
+        run: flutter create . --platforms=android --org com.dalini.aqsa --project-name dalini_aqsa
+
       - name: تثبيت الحزم
         working-directory: app
         run: flutter pub get
