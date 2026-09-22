@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: dalini-aqsa
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CODE_SECRET
+        generateValue: true
