@@ -29,7 +29,7 @@ class AqApp extends StatelessWidget {
       theme: AQ.theme(),
       locale: const Locale('ar'),
       supportedLocales: const <Locale>[Locale('ar')],
-      localizationDelegates: const <LocalizationsDelegate<dynamic>>[
+      localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
