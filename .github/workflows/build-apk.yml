@@ -42,6 +42,9 @@ jobs:
       - name: تحديث نسخة Kotlin
         working-directory: app
         run: sed -i "s/id \"org.jetbrains.kotlin.android\" version \"[^\"]*\"/id \"org.jetbrains.kotlin.android\" version \"1.9.24\"/" android/settings.gradle
+      - name: إضافة صلاحية الإنترنت
+        working-directory: app
+        run: sed -i "s#<uses-permission android:name=\"android.permission.INTERNET\"/>##; /<manifest /a\    <uses-permission android:name=\"android.permission.INTERNET\" />" android/app/src/main/AndroidManifest.xml
 
       - name: تثبيت الحزم
         working-directory: app
