@@ -1,0 +1,12 @@
+{
+  "name": "dalini-aqsa-backend",
+  "version": "1.0.0",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/smoke.js"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": { "pg": "^8.13.0" }
+}

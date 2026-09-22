@@ -1,0 +1,52 @@
+name: Build APK - دليني الأقصى
+
+on:
+  push:
+    branches: [ dalini-aqsa ]
+    paths:
+      - 'app/**'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: 'رابط الخادم (Backend URL)'
+        required: false
+        default: 'https://dalini-aqsa.onrender.com'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: stable
+          cache: true
+
+      - name: تثبيت الحزم
+        working-directory: app
+        run: flutter pub get
+
+      - name: تحليل الكود
+        working-directory: app
+        run: flutter analyze --no-fatal-infos
+
+      - name: بناء APK (Release)
+        working-directory: app
+        run: |
+          flutter build apk --release \
+            --dart-define=API_URL=${{ github.event.inputs.api_url || 'https://dalini-aqsa.onrender.com' }}
+
+      - name: رفع ملف التثبيت
+        uses: actions/upload-artifact@v4
+        with:
+          name: dalini-aqsa-apk
+          path: app/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
