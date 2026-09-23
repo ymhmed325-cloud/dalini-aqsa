@@ -11,7 +11,7 @@ on:
       api_url:
         description: 'رابط الخادم (Backend URL)'
         required: false
-        default: 'https://dalini-aqsa.onrender.com'
+        default: 'https://dalini-aqsa-gv2p.onrender.com'
 
 jobs:
   build:
@@ -58,7 +58,7 @@ jobs:
         working-directory: app
         run: |
           flutter build apk --release \
-            --dart-define=API_URL=${{ github.event.inputs.api_url || 'https://dalini-aqsa.onrender.com' }}
+            --dart-define=API_URL=${{ github.event.inputs.api_url || 'https://dalini-aqsa-gv2p.onrender.com' }}
 
       - name: رفع ملف التثبيت
         uses: actions/upload-artifact@v4

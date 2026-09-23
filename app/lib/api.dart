@@ -6,7 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 /// عنوان الخادم. يُضبط عند البناء: --dart-define=API_URL=https://...
-const String kApiUrl = String.fromEnvironment('API_URL', defaultValue: 'https://dalini-aqsa.onrender.com');
+const String kApiUrl = String.fromEnvironment('API_URL', defaultValue: 'https://dalini-aqsa-gv2p.onrender.com');
 
 String s(dynamic v, [String fallback = '']) {
   if (v == null) return fallback;
