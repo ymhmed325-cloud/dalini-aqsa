@@ -78,6 +78,10 @@ jobs:
         working-directory: app
         run: flutter analyze --no-fatal-infos || true
 
+      - name: توليد أيقونات التطبيق
+        working-directory: app
+        run: dart run flutter_launcher_icons
+
       - name: بناء APK
         working-directory: app
         run: |
