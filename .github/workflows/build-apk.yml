@@ -115,15 +115,21 @@ jobs:
       - name: ترقية Android SDK إلى 35
         working-directory: app
         run: |
-          BUILD_GRADLE="android/app/build.gradle"
-          if [ -f "$BUILD_GRADLE" ]; then
-            sed -i 's/compileSdkVersion [0-9]*/compileSdkVersion 35/g' "$BUILD_GRADLE"
-            sed -i 's/compileSdk = [0-9]*/compileSdk = 35/g' "$BUILD_GRADLE"
-            sed -i 's/targetSdkVersion [0-9]*/targetSdkVersion 35/g' "$BUILD_GRADLE"
-            sed -i 's/targetSdk = [0-9]*/targetSdk = 35/g' "$BUILD_GRADLE"
-            echo "build.gradle:"
-            grep -E "compileSdk|targetSdk|minSdk" "$BUILD_GRADLE"
-          fi
+          echo "📄 قبل:"
+          head -20 android/app/build.gradle
+          python3 -c "
+import re
+p = 'android/app/build.gradle'
+s = open(p).read()
+s = re.sub(r'(compileSdkVersion|compileSdk)\s+\d+', r'compileSdk 35', s)
+s = re.sub(r'(compileSdkVersion|compileSdk)\s+flutter\.\w+', r'compileSdk 35', s)
+s = re.sub(r'(targetSdkVersion|targetSdk)\s+\d+', r'targetSdk 35', s)
+s = re.sub(r'(targetSdkVersion|targetSdk)\s+flutter\.\w+', r'targetSdk 35', s)
+open(p, 'w').write(s)
+print('FIXED')
+"
+          echo "📄 بعد:"
+          head -20 android/app/build.gradle
 
       - name: بناء APK
         working-directory: app
