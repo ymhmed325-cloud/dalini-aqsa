@@ -27,6 +27,12 @@ const SCHEMA = [
     id SERIAL PRIMARY KEY, request_id TEXT NOT NULL REFERENCES aq_requests(id) ON DELETE CASCADE,
     status TEXT NOT NULL, actor TEXT NOT NULL, note TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`,
+  `CREATE TABLE IF NOT EXISTS aq_ratings (
+    id TEXT PRIMARY KEY, request_id TEXT NOT NULL REFERENCES aq_requests(id) ON DELETE CASCADE,
+    customer_id TEXT NOT NULL REFERENCES aq_users(id) ON DELETE CASCADE,
+    provider_id TEXT NOT NULL REFERENCES aq_users(id) ON DELETE CASCADE,
+    stars INTEGER NOT NULL, comment TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE (request_id))`,
   `CREATE INDEX IF NOT EXISTS aq_requests_user_idx ON aq_requests (user_id)`,
   `CREATE INDEX IF NOT EXISTS aq_requests_status_idx ON aq_requests (status)`,
   `CREATE INDEX IF NOT EXISTS aq_offers_request_idx ON aq_offers (request_id)`,
@@ -34,9 +40,11 @@ const SCHEMA = [
 
 function dupError() { const e = new Error('duplicate'); e.code = 'DUP_EMAIL'; return e; }
 
+const RATING = (r) => (r ? { id: r.id, request_id: r.request_id, customer_id: r.customer_id, provider_id: r.provider_id, stars: r.stars, comment: r.comment, created_at: (r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at) } : null);
+
 function memoryStore() {
   const users = new Map(), byEmail = new Map(), sessions = new Map(), resets = new Map();
-  const requests = new Map(), offers = new Map(); const events = [];
+  const requests = new Map(), offers = new Map(); const events = []; const ratings = new Map();
   const now = () => new Date().toISOString();
   return {
     kind: 'memory',
@@ -100,6 +108,29 @@ function memoryStore() {
     },
     async offerCounts(ids) {
       const out = {}; for (const o of offers.values()) if (ids.includes(o.request_id)) out[o.request_id] = (out[o.request_id] || 0) + 1;
+      return out;
+    },
+    async addRating(r) {
+      if (ratings.has(r.request_id)) throw new Error('DUP_RATING');
+      const row = { ...r, created_at: now() }; ratings.set(row.id, row); return { ...row };
+    },
+    async ratingForRequest(rid) {
+      for (const x of ratings.values()) if (x.request_id === rid) return { ...x };
+      return null;
+    },
+    async ratingsForProvider(pid) {
+      return [...ratings.values()].filter((x) => x.provider_id === pid)
+        .sort((a, b) => b.created_at.localeCompare(a.created_at)).map((x) => ({ ...x }));
+    },
+    async ratingStatsForProviders(ids) {
+      const out = {};
+      for (const id of ids) {
+        const list = [...ratings.values()].filter((x) => x.provider_id === id);
+        if (list.length) {
+          const sum = list.reduce((a, x) => a + x.stars, 0);
+          out[id] = { avg: sum / list.length, count: list.length };
+        }
+      }
       return out;
     },
     async addEvent(rid, status, actor, note) { events.push({ request_id: rid, status, actor, note: note || '', created_at: now() }); },
@@ -173,6 +204,26 @@ function pgStore(url) {
       if (!ids.length) return {};
       const r = await q('SELECT request_id, COUNT(*)::int AS n FROM aq_offers WHERE request_id = ANY($1) GROUP BY request_id', [ids]);
       const out = {}; for (const x of r.rows) out[x.request_id] = x.n; return out;
+    },
+    async addRating(r) {
+      try {
+        const x = await q('INSERT INTO aq_ratings (id,request_id,customer_id,provider_id,stars,comment) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *', [r.id, r.request_id, r.customer_id, r.provider_id, r.stars, r.comment]);
+        return RATING(x.rows[0]);
+      } catch (e) { if (e.code === '23505') { const err = new Error('DUP_RATING'); err.code = 'DUP_RATING'; throw err; } throw e; }
+    },
+    async ratingForRequest(rid) {
+      const r = (await q('SELECT * FROM aq_ratings WHERE request_id=$1', [rid])).rows[0];
+      return r ? RATING(r) : null;
+    },
+    async ratingsForProvider(pid) {
+      return (await q('SELECT * FROM aq_ratings WHERE provider_id=$1 ORDER BY created_at DESC LIMIT 100', [pid])).rows.map(RATING);
+    },
+    async ratingStatsForProviders(ids) {
+      if (!ids.length) return {};
+      const r = await q('SELECT provider_id, AVG(stars)::float AS avg, COUNT(*)::int AS count FROM aq_ratings WHERE provider_id = ANY($1) GROUP BY provider_id', [ids]);
+      const out = {};
+      for (const x of r.rows) out[x.provider_id] = { avg: x.avg, count: x.count };
+      return out;
     },
     async addEvent(rid, status, actor, note) { await q('INSERT INTO aq_events (request_id,status,actor,note) VALUES ($1,$2,$3,$4)', [rid, status, actor, note || '']); },
     async eventsFor(rid) {

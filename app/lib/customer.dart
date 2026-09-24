@@ -9,6 +9,7 @@ import 'home_tab.dart';
 import 'drawer_menu.dart';
 import 'notifications_screen.dart';
 import 'city_picker.dart';
+import 'rating_screen.dart';
 
 // ================= الإطار الرئيسي للزبون =================
 class CustomerShell extends StatefulWidget {
@@ -741,6 +742,14 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                           const SizedBox(width: 4),
                           Text('يصل خلال ${s(o['eta_minutes'])} دقيقة', style: const TextStyle(fontSize: 12.5, color: AQ.muted)),
                         ]),
+                        if (asMap(o['rating']).isNotEmpty) ...<Widget>[
+                          const SizedBox(height: 4),
+                          Row(children: <Widget>[
+                            const Icon(Icons.star_rounded, size: 15, color: AQ.gold),
+                            const SizedBox(width: 4),
+                            Text('${(asMap(o['rating'])['avg'] as num).toStringAsFixed(1)} (${asMap(o['rating'])['count']})', style: const TextStyle(fontSize: 12.5, color: AQ.gold, fontWeight: FontWeight.w800)),
+                          ]),
+                        ],
                       ],
                     ),
                   ),
@@ -899,6 +908,36 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                   if (canCancel) ...<Widget>[
                     const SizedBox(height: 20),
                     AqButton(label: 'إلغاء الطلب', icon: Icons.close_rounded, danger: true, busy: acting, onPressed: cancel),
+                  ],
+                  if (st == 'completed' && asMap(d['my_rating']).isEmpty) ...<Widget>[
+                    const SizedBox(height: 16),
+                    AqButton(
+                      label: 'قيّم الفني',
+                      icon: Icons.star_rounded,
+                      gold: true,
+                      onPressed: () async {
+                        final pname = s(provider['name'], 'الفني');
+                        final ok = await Navigator.of(context).push<bool>(
+                          fadeRoute<bool>(RatingScreen(requestId: widget.id, providerName: pname)),
+                        );
+                        if (ok == true) load();
+                      },
+                    ),
+                  ],
+                  if (st == 'completed' && asMap(d['my_rating']).isNotEmpty) ...<Widget>[
+                    const SizedBox(height: 16),
+                    AqCard(
+                      child: Row(children: <Widget>[
+                        const Icon(Icons.star_rounded, color: AQ.gold, size: 30),
+                        const SizedBox(width: 12),
+                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
+                          const Text('تقييمك', style: TextStyle(fontWeight: FontWeight.w900, color: AQ.text)),
+                          const SizedBox(height: 4),
+                          Text('${asMap(d['my_rating'])['stars']} من 5', style: const TextStyle(color: AQ.muted, fontSize: 13)),
+                        ])),
+                        Text('⭐', style: TextStyle(fontSize: 20 + (asMap(d['my_rating'])['stars'] as int? ?? 0) * 2.0)),
+                      ]),
+                    ),
                   ],
                 ],
               ),

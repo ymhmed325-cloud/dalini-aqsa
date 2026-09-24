@@ -103,12 +103,14 @@ async function ownerView(r) {
   const offers = [];
   for (const o of list) {
     const p = await store.userById(o.provider_id);
-    offers.push({ id: o.id, provider_id: o.provider_id, provider_name: p ? p.name : 'فني', price: o.price, eta_minutes: o.eta_minutes, created_at: o.created_at });
+    const stat = (await store.ratingStatsForProviders([o.provider_id]))[o.provider_id] || null;
+    offers.push({ id: o.id, provider_id: o.provider_id, provider_name: p ? p.name : 'فني', price: o.price, eta_minutes: o.eta_minutes, created_at: o.created_at, rating: stat });
   }
   offers.sort((a, b) => a.price - b.price);
   let provider = null;
   if (r.provider_id) { const p = await store.userById(r.provider_id); if (p) provider = { id: p.id, name: p.name }; }
-  return { id: r.id, category: r.category, description: r.description, area: r.area, address: r.address, status: r.status, created_at: r.created_at, provider, offers, events: await store.eventsFor(r.id) };
+  const myRating = await store.ratingForRequest(r.id);
+  return { id: r.id, category: r.category, description: r.description, area: r.area, address: r.address, status: r.status, created_at: r.created_at, provider, offers, events: await store.eventsFor(r.id), my_rating: myRating };
 }
 async function jobView(r) {
   const c = await store.userById(r.user_id);
@@ -294,6 +296,37 @@ route('POST', '/api/providers/requests/:id/status', [auth, only('provider')], as
   if (!upd) return c.fail(409, 'تغيّرت حالة الطلب، حدّث الصفحة');
   await store.addEvent(r.id, next, 'provider', '');
   return c.json(200, { request: await jobView(upd) });
+});
+
+// ---------- التقييمات ----------
+route('POST', '/api/requests/:id/rate', [auth, only('customer')], async (c) => {
+  const r = await getReq(c.params.id);
+  if (!r || r.user_id !== c.user.id) return c.fail(404, 'الطلب غير موجود');
+  if (r.status !== 'completed') return c.fail(409, 'لا يمكن تقييم طلب غير مكتمل');
+  if (!r.provider_id) return c.fail(409, 'لا يوجد فني لطلبك');
+  const stars = Number(c.body.stars);
+  const comment = String(c.body.comment || '').trim().slice(0, 500);
+  if (!Number.isInteger(stars) || stars < 1 || stars > 5) return c.fail(400, 'أدخل تقييماً من 1 إلى 5 نجوم');
+  try {
+    const r2 = await store.addRating({ id: crypto.randomUUID(), request_id: r.id, customer_id: c.user.id, provider_id: r.provider_id, stars, comment });
+    return c.json(201, { rating: r2 });
+  } catch (e) {
+    if (e.code === 'DUP_RATING') return c.fail(409, 'لقد قيّمت هذا الطلب سابقاً');
+    throw e;
+  }
+});
+
+route('GET', '/api/providers/:id/ratings', [auth], async (c) => {
+  const pid = c.params.id;
+  if (!ID_RX.test(pid)) return c.fail(400, 'معرّف غير صحيح');
+  const list = await store.ratingsForProvider(pid);
+  const stats = (await store.ratingStatsForProviders([pid]))[pid] || { avg: 0, count: 0 };
+  return c.json(200, { ratings: list, stats });
+});
+
+route('GET', '/api/providers/me/rating-stats', [auth, only('provider')], async (c) => {
+  const stats = (await store.ratingStatsForProviders([c.user.id]))[c.user.id] || { avg: 0, count: 0 };
+  return c.json(200, { stats });
 });
 
 // ---------- الخادم ----------
