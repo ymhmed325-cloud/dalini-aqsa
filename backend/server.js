@@ -355,6 +355,37 @@ route('POST', '/api/requests/:id/messages', [auth, rl('msg', 60, 60e3, (c) => c.
   return c.json(201, { message: m });
 });
 
+// ---------- الاشتراكات ----------
+const PLANS = {
+  free:       { name: 'مجاني',     price: 0,     limit: 5 },
+  basic:      { name: 'أساسي',     price: 15000, limit: 9999 },
+  pro:        { name: 'احترافي',   price: 30000, limit: 9999 },
+  vip:        { name: 'VIP',       price: 60000, limit: 9999 },
+};
+const VERIFY_PRICE = 15000;
+
+route('GET', '/api/providers/me/subscription', [auth, only('provider')], async (c) => {
+  const sub = await store.getSub(c.user.id);
+  const plan = PLANS[sub.plan] || PLANS.free;
+  return c.json(200, { subscription: sub, plan });
+});
+
+route('POST', '/api/providers/me/subscribe', [auth, only('provider')], async (c) => {
+  const plan = String(c.body.plan || '');
+  if (!PLANS[plan] || plan === 'free') return c.fail(400, 'اختر باقة صحيحة');
+  const now = Date.now();
+  const expires = new Date(now + 30 * 24 * 3600 * 1000);
+  const sub = await store.upsertSub(c.user.id, { plan, expires_at: expires });
+  return c.json(200, { subscription: sub, message: 'تم تفعيل الباقة لمدة 30 يوماً' });
+});
+
+route('POST', '/api/providers/me/verify', [auth, only('provider')], async (c) => {
+  const sub = await store.getSub(c.user.id);
+  if (sub.verified) return c.fail(409, 'حسابك موثّق بالفعل');
+  const upd = await store.upsertSub(c.user.id, { verify_status: 'pending' });
+  return c.json(200, { subscription: upd, message: 'تم إرسال طلب التوثيق — سيراجعه الفريق' });
+});
+
 // ---------- الخادم ----------
 function readBody(req) {
   return new Promise((resolve, reject) => {

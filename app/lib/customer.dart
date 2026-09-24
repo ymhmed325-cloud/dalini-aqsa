@@ -736,7 +736,13 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        Text(name, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AQ.text)),
+                        Row(children: <Widget>[
+                          Flexible(child: Text(name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AQ.text))),
+                          if (asMap(o['rating']).isNotEmpty && (asMap(o['rating'])['count'] as num? ?? 0) >= 5) ...<Widget>[
+                            const SizedBox(width: 6),
+                            const Icon(Icons.verified, color: AQ.gold, size: 16),
+                          ],
+                        ]),
                         const SizedBox(height: 4),
                         Row(children: <Widget>[
                           const Icon(Icons.schedule_rounded, size: 15, color: AQ.muted),

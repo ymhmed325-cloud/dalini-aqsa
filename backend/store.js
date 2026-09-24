@@ -39,6 +39,20 @@ const SCHEMA = [
     sender_role TEXT NOT NULL, text TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`,
   `CREATE INDEX IF NOT EXISTS aq_messages_request_idx ON aq_messages (request_id)`,
+  `CREATE TABLE IF NOT EXISTS aq_subscriptions (
+    user_id TEXT PRIMARY KEY REFERENCES aq_users(id) ON DELETE CASCADE,
+    plan TEXT NOT NULL DEFAULT 'free',
+    verified BOOLEAN NOT NULL DEFAULT FALSE,
+    verify_status TEXT NOT NULL DEFAULT 'none',
+    expires_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`,
+  `CREATE TABLE IF NOT EXISTS aq_subscriptions (
+    user_id TEXT PRIMARY KEY REFERENCES aq_users(id) ON DELETE CASCADE,
+    plan TEXT NOT NULL DEFAULT 'free',
+    verified BOOLEAN NOT NULL DEFAULT FALSE,
+    verify_status TEXT NOT NULL DEFAULT 'none',
+    expires_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`,
   `CREATE INDEX IF NOT EXISTS aq_requests_user_idx ON aq_requests (user_id)`,
   `CREATE INDEX IF NOT EXISTS aq_requests_status_idx ON aq_requests (status)`,
   `CREATE INDEX IF NOT EXISTS aq_offers_request_idx ON aq_offers (request_id)`,
@@ -50,9 +64,11 @@ const RATING = (r) => (r ? { id: r.id, request_id: r.request_id, customer_id: r.
 
 const MSG = (r) => (r ? { id: r.id, request_id: r.request_id, sender_id: r.sender_id, sender_role: r.sender_role, text: r.text, created_at: (r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at) } : null);
 
+const SUB = (r) => (r ? { user_id: r.user_id, plan: r.plan, verified: r.verified, verify_status: r.verify_status, expires_at: (r.expires_at instanceof Date ? r.expires_at.toISOString() : r.expires_at) } : null);
+
 function memoryStore() {
   const users = new Map(), byEmail = new Map(), sessions = new Map(), resets = new Map();
-  const requests = new Map(), offers = new Map(); const events = []; const ratings = new Map(); const messages = new Map();
+  const requests = new Map(), offers = new Map(); const events = []; const ratings = new Map(); const messages = new Map(); const subs = new Map(); const subs = new Map();
   const now = () => new Date().toISOString();
   return {
     kind: 'memory',
@@ -147,6 +163,36 @@ function memoryStore() {
     async messagesFor(rid) {
       return [...messages.values()].filter((x) => x.request_id === rid)
         .sort((a, b) => a.created_at.localeCompare(b.created_at)).map((x) => ({ ...x }));
+    },
+    async getSub(uid) {
+      const s = subs.get(uid);
+      return s ? { ...s } : { user_id: uid, plan: 'free', verified: false, verify_status: 'none', expires_at: null };
+    },
+    async upsertSub(uid, patch) {
+      const cur = subs.get(uid) || { user_id: uid, plan: 'free', verified: false, verify_status: 'none', expires_at: null };
+      const row = { ...cur, ...patch, updated_at: now() };
+      subs.set(uid, row);
+      return { ...row };
+    },
+    async verifiedMap(ids) {
+      const out = {};
+      for (const id of ids) { const s = subs.get(id); out[id] = s ? s.verified : false; }
+      return out;
+    },
+    async getSub(uid) {
+      const s = subs.get(uid);
+      return s ? { ...s } : { user_id: uid, plan: 'free', verified: false, verify_status: 'none', expires_at: null };
+    },
+    async upsertSub(uid, patch) {
+      const cur = subs.get(uid) || { user_id: uid, plan: 'free', verified: false, verify_status: 'none', expires_at: null };
+      const row = { ...cur, ...patch, updated_at: now() };
+      subs.set(uid, row);
+      return { ...row };
+    },
+    async verifiedMap(ids) {
+      const out = {};
+      for (const id of ids) { const s = subs.get(id); out[id] = s ? s.verified : false; }
+      return out;
     },
     async addEvent(rid, status, actor, note) { events.push({ request_id: rid, status, actor, note: note || '', created_at: now() }); },
     async eventsFor(rid) { return events.filter((e) => e.request_id === rid).map(({ status, actor, note, created_at }) => ({ status, actor, note, created_at })); },
@@ -246,6 +292,23 @@ function pgStore(url) {
     },
     async messagesFor(rid) {
       return (await q('SELECT * FROM aq_messages WHERE request_id=$1 ORDER BY created_at ASC LIMIT 500', [rid])).rows.map(MSG);
+    },
+    async getSub(uid) {
+      const r = (await q('SELECT * FROM aq_subscriptions WHERE user_id=$1', [uid])).rows[0];
+      return r ? SUB(r) : { user_id: uid, plan: 'free', verified: false, verify_status: 'none', expires_at: null };
+    },
+    async upsertSub(uid, patch) {
+      const cur = await this.getSub(uid);
+      const merged = { ...cur, ...patch };
+      await q('INSERT INTO aq_subscriptions (user_id, plan, verified, verify_status, expires_at) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (user_id) DO UPDATE SET plan=$2, verified=$3, verify_status=$4, expires_at=$5, updated_at=NOW()', [uid, merged.plan, merged.verified, merged.verify_status, merged.expires_at]);
+      return await this.getSub(uid);
+    },
+    async verifiedMap(ids) {
+      if (!ids.length) return {};
+      const r = await q('SELECT user_id, verified FROM aq_subscriptions WHERE user_id = ANY($1) AND verified = true', [ids]);
+      const out = {};
+      for (const x of r.rows) out[x.user_id] = true;
+      return out;
     },
     async addEvent(rid, status, actor, note) { await q('INSERT INTO aq_events (request_id,status,actor,note) VALUES ($1,$2,$3,$4)', [rid, status, actor, note || '']); },
     async eventsFor(rid) {

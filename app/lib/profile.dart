@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'theme.dart';
 import 'api.dart';
 import 'widgets.dart';
+import 'upgrade_screen.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
@@ -95,6 +96,15 @@ class _ProfileTabState extends State<ProfileTab> {
             children: <Widget>[
               FadeSlide(delay: const Duration(milliseconds: 300), child: _Tile(icon: Icons.badge_outlined, title: 'تعديل الاسم', onTap: _editName)),
               FadeSlide(delay: const Duration(milliseconds: 380), child: _Tile(icon: Icons.lock_outline, title: 'تغيير كلمة المرور', onTap: _changePassword)),
+              if (provider)
+                FadeSlide(
+                  delay: const Duration(milliseconds: 420),
+                  child: _Tile(
+                    icon: Icons.workspace_premium,
+                    title: 'ترقية حسابي',
+                    onTap: () => Navigator.of(context).push(fadeRoute<void>(const UpgradeScreen())),
+                  ),
+                ),
               FadeSlide(delay: const Duration(milliseconds: 460), child: _Tile(icon: Icons.logout_rounded, title: 'تسجيل الخروج', danger: true, onTap: _logout)),
               const SizedBox(height: 26),
               const Text('دليني • الإصدار 1.0', style: TextStyle(color: AQ.muted, fontSize: 12.5)),
