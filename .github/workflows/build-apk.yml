@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       api_url:
-        description: 'رابط الخادم (Backend URL)'
+        description: 'رابط الخادم'
         required: false
         default: 'https://dalini-aqsa-gv2p.onrender.com'
 
@@ -34,41 +34,51 @@ jobs:
         working-directory: app
         run: flutter pub get
 
-      - name: توليد مجلد android إن لم يكن موجوداً
+      - name: توليد android إن لم يكن موجوداً
         working-directory: app
         run: |
           if [ ! -d "android" ]; then
-            echo "🔨 توليد مجلد android..."
             flutter create --platforms=android --org com.dalini --project-name dalini_aqsa .
-          else
-            echo "✅ مجلد android موجود"
           fi
 
-      - name: تحديث إصدار Kotlin إلى 2.0.0
+      - name: تحديث Kotlin إلى 2.0.0
         working-directory: app
         run: |
-          # تحديث settings.gradle (الطريقة الحديثة)
           if [ -f android/settings.gradle ]; then
             sed -i "s/id \"org.jetbrains.kotlin.android\" version \"[^\"]*\"/id \"org.jetbrains.kotlin.android\" version \"2.0.0\"/g" android/settings.gradle
-            grep -n "kotlin" android/settings.gradle || true
           fi
-          # تحديث build.gradle (الطريقة القديمة)
           if [ -f android/build.gradle ]; then
             sed -i "s/ext.kotlin_version = '[^']*'/ext.kotlin_version = '2.0.0'/g" android/build.gradle
-            grep -n "kotlin_version" android/build.gradle || true
           fi
+
+      - name: إضافة صلاحية INTERNET
+        working-directory: app
+        run: |
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          echo "📄 المحتوى الأصلي:"
+          cat "$MANIFEST"
+          echo ""
+          if ! grep -q "android.permission.INTERNET" "$MANIFEST"; then
+            sed -i 's|<application|<uses-permission android:name="android.permission.INTERNET"/>\n    <application|' "$MANIFEST"
+            echo "✅ تمت إضافة صلاحية INTERNET"
+          else
+            echo "ℹ️ الصلاحية موجودة"
+          fi
+          echo ""
+          echo "📄 بعد التعديل:"
+          cat "$MANIFEST"
 
       - name: تحليل الكود
         working-directory: app
         run: flutter analyze --no-fatal-infos || true
 
-      - name: بناء APK (Release)
+      - name: بناء APK
         working-directory: app
         run: |
           flutter build apk --release \
             --dart-define=API_URL=${{ github.event.inputs.api_url || 'https://dalini-aqsa-gv2p.onrender.com' }}
 
-      - name: رفع ملف التثبيت
+      - name: رفع APK
         uses: actions/upload-artifact@v4
         with:
           name: dalini-aqsa-apk
