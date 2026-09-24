@@ -41,6 +41,14 @@ jobs:
             flutter create --platforms=android --org com.dalini --project-name dalini_aqsa .
           fi
 
+      - name: تسمية التطبيق "دليني"
+        working-directory: app
+        run: |
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          sed -i 's/android:label="[^"]*"/android:label="دليني"/g' "$MANIFEST"
+          echo "📄 label:"
+          grep 'android:label' "$MANIFEST"
+
       - name: تحديث Kotlin إلى 2.0.0
         working-directory: app
         run: |
