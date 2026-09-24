@@ -20,6 +20,13 @@ class CustomerShell extends StatefulWidget {
 
 class _CustomerShellState extends State<CustomerShell> {
   int tab = 0;
+  String _city = 'بغداد';
+
+  Future<void> _pickCity() async {
+    final c = await pickCity(context, _city);
+    if (c != null && mounted) setState(() => _city = c);
+  }
+
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   Future<void> newRequest([String? service]) async {
@@ -29,7 +36,7 @@ class _CustomerShellState extends State<CustomerShell> {
 
   @override
   Widget build(BuildContext context) {
-    final Widget page = tab == 0 ? NewHomeTab(onNew: newRequest, onMenu: () => _scaffoldKey.currentState?.openDrawer(), onNotif: () => Navigator.of(context).push(fadeRoute<void>(const NotificationsScreen()))) : (tab == 1 ? const OrdersTab() : (tab == 2 ? const _ChatsTab() : const ProfileTab()));
+    final Widget page = tab == 0 ? NewHomeTab(onNew: newRequest, onMenu: () => _scaffoldKey.currentState?.openDrawer(), onNotif: () => Navigator.of(context).push(fadeRoute<void>(const NotificationsScreen())), onCity: _pickCity) : (tab == 1 ? const OrdersTab() : (tab == 2 ? const _ChatsTab() : const ProfileTab()));
     return Scaffold(
       key: _scaffoldKey,
       drawer: AppDrawer(onNew: newRequest, onGo: (i) => setState(() => tab = i)),

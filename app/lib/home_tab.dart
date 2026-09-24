@@ -4,17 +4,18 @@ import 'api.dart';
 import 'widgets.dart';
 
 class NewHomeTab extends StatelessWidget {
-  const NewHomeTab({super.key, required this.onNew, required this.onMenu, required this.onNotif});
+  const NewHomeTab({super.key, required this.onNew, required this.onMenu, required this.onNotif, required this.onCity});
   final Future<void> Function([String?]) onNew;
   final VoidCallback onMenu;
   final VoidCallback onNotif;
+  final VoidCallback onCity;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: EdgeInsets.zero,
       children: <Widget>[
-        _Hero(onMenu: onMenu, onNotif: onNotif),
+        _Hero(onMenu: onMenu, onNotif: onNotif, onCity: onCity),
         Transform.translate(
           offset: const Offset(0, -22),
           child: Padding(
@@ -47,9 +48,10 @@ class NewHomeTab extends StatelessWidget {
 }
 
 class _Hero extends StatelessWidget {
-  const _Hero({required this.onMenu, required this.onNotif});
+  const _Hero({required this.onMenu, required this.onNotif, required this.onCity});
   final VoidCallback onMenu;
   final VoidCallback onNotif;
+  final VoidCallback onCity;
 
   @override
   Widget build(BuildContext context) {

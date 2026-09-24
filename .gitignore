@@ -11,3 +11,4 @@ apk_new/
 apk_new_new/
 *.apk
 *.bak
+.aider*
