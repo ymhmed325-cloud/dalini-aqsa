@@ -110,12 +110,12 @@ async function ownerView(r) {
   let provider = null;
   if (r.provider_id) { const p = await store.userById(r.provider_id); if (p) provider = { id: p.id, name: p.name }; }
   const myRating = await store.ratingForRequest(r.id);
-  return { id: r.id, category: r.category, description: r.description, area: r.area, address: r.address, status: r.status, created_at: r.created_at, provider, offers, events: await store.eventsFor(r.id), my_rating: myRating };
+  return { id: r.id, category: r.category, description: r.description, area: r.area, address: r.address, status: r.status, image_b64: r.image_b64 || '', created_at: r.created_at, provider, offers, events: await store.eventsFor(r.id), my_rating: myRating };
 }
 async function jobView(r) {
   const c = await store.userById(r.user_id);
   const i = FLOW.indexOf(r.status);
-  return { id: r.id, category: r.category, description: r.description, area: r.area, address: r.address, status: r.status, created_at: r.created_at, customer_name: c ? c.name : '', allowed_next: i >= 0 && i < FLOW.length - 1 ? FLOW[i + 1] : null, events: await store.eventsFor(r.id) };
+  return { id: r.id, category: r.category, description: r.description, area: r.area, address: r.address, status: r.status, image_b64: r.image_b64 || '', created_at: r.created_at, customer_name: c ? c.name : '', allowed_next: i >= 0 && i < FLOW.length - 1 ? FLOW[i + 1] : null, events: await store.eventsFor(r.id) };
 }
 const getReq = async (id) => (ID_RX.test(id) ? store.requestById(id) : null);
 
@@ -213,11 +213,13 @@ route('POST', '/api/auth/reset-password', [rl('rs-ip', 20, 3600e3), rl('rs-email
 route('POST', '/api/requests', [auth, only('customer'), rl('req-new', 20, 3600e3, (c) => c.user.id)], async (c) => {
   const category = String(c.body.category || ''); const description = String(c.body.description || '').trim();
   const area = String(c.body.area || '').trim(); const address = String(c.body.address || '').trim();
+  const imageB64 = String(c.body.image_b64 || '').trim();
   if (!CAT_IDS.includes(category)) return c.fail(400, 'اختر نوع الخدمة');
   if (description.length < 4 || description.length > 2000) return c.fail(400, 'اشرح المشكلة بجملة واضحة (4 أحرف على الأقل)');
   if (area.length < 2 || area.length > 80) return c.fail(400, 'اكتب المنطقة، مثال: الكرادة');
   if (address.length > 300) return c.fail(400, 'العنوان طويل جداً');
-  const r = await store.createRequest({ id: crypto.randomUUID(), user_id: c.user.id, category, description, area, address });
+  if (imageB64.length > 1400000) return c.fail(413, 'حجم الصورة كبير جداً (الحد ~1MB)');
+  const r = await store.createRequest({ id: crypto.randomUUID(), user_id: c.user.id, category, description, area, address, image_b64: imageB64 });
   await store.addEvent(r.id, 'matching', 'customer', 'تم إرسال الطلب');
   return c.json(201, { request: { id: r.id, category, description, area, status: r.status, created_at: r.created_at } });
 });
@@ -262,7 +264,7 @@ route('GET', '/api/providers/requests', [auth, only('provider')], async (c) => {
   for (const r of list) {
     const mine = await store.offerOf(r.id, c.user.id);
     // بدون user_id أو العنوان الدقيق: يظهر للفني بعد قبول الزبون لعرضه فقط
-    out.push({ id: r.id, category: r.category, description: r.description, area: r.area, status: r.status, created_at: r.created_at, my_offer: mine ? { price: mine.price, eta_minutes: mine.eta_minutes } : null });
+    out.push({ id: r.id, category: r.category, description: r.description, area: r.area, status: r.status, image_b64: r.image_b64 || '', created_at: r.created_at, my_offer: mine ? { price: mine.price, eta_minutes: mine.eta_minutes } : null });
   }
   return c.json(200, { requests: out });
 });

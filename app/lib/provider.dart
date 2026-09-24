@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'theme.dart';
@@ -164,6 +165,13 @@ class _AvailableCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(s(item['description']), maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AQ.text, height: 1.5)),
+            if (s(item['image_b64']).isNotEmpty) ...<Widget>[
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.memory(base64Decode(s(item['image_b64']).split(',').last), height: 160, width: double.infinity, fit: BoxFit.cover),
+              ),
+            ],
             const SizedBox(height: 10),
             Row(children: <Widget>[
               const Icon(Icons.place_outlined, size: 16, color: AQ.teal),

@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'theme.dart';
 import 'logo.dart';
@@ -257,6 +260,23 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
   final TextEditingController address = TextEditingController();
   bool busy = false;
   bool done = false;
+  String? _imageB64;
+  final ImagePicker _picker = ImagePicker();
+
+  Future<void> _pickImage() async {
+    try {
+      final x = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 1024, imageQuality: 75);
+      if (x == null) return;
+      final bytes = await x.readAsBytes();
+      if (bytes.length > 1000000) {
+        if (mounted) showAqSnack(context, 'حجم الصورة كبير — اختر صورة أصغر', error: true);
+        return;
+      }
+      setState(() => _imageB64 = 'data:image/jpeg;base64,${base64Encode(bytes)}');
+    } catch (e) {
+      if (mounted) showAqSnack(context, 'تعذر فتح الصورة', error: true);
+    }
+  }
 
   @override
   void initState() {
@@ -291,6 +311,7 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
       'description': desc.text.trim(),
       'area': area.text.trim(),
       'address': address.text.trim(),
+      'image_b64': _imageB64 ?? '',
     });
     if (!mounted) return;
     setState(() => busy = false);
@@ -414,7 +435,25 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
             child: Column(
               children: <Widget>[
                 TextField(controller: desc, minLines: 3, maxLines: 5, maxLength: 500, textInputAction: TextInputAction.newline, decoration: aqInput('اشرح المشكلة', Icons.edit_note_rounded)),
-                const SizedBox(height: 6),
+                const SizedBox(height: 10),
+                if (_imageB64 == null)
+                  AqButton(label: 'أضف صورة (اختياري)', icon: Icons.add_photo_alternate_outlined, gold: true, onPressed: _pickImage)
+                else
+                  Stack(children: <Widget>[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.memory(base64Decode(_imageB64!.split(',').last), height: 160, width: double.infinity, fit: BoxFit.cover),
+                    ),
+                    Positioned(top: 8, left: 8, child: GestureDetector(
+                      onTap: () => setState(() => _imageB64 = null),
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: const BoxDecoration(color: AQ.danger, shape: BoxShape.circle),
+                        child: const Icon(Icons.close, color: Colors.white, size: 16),
+                      ),
+                    )),
+                  ]),
+                const SizedBox(height: 14),
                 TextField(controller: area, textInputAction: TextInputAction.next, decoration: aqInput('المنطقة', Icons.place_outlined, hint: 'مثال: الكرادة')),
                 const SizedBox(height: 14),
                 TextField(controller: address, textInputAction: TextInputAction.done, decoration: aqInput('العنوان بالتفصيل (اختياري)', Icons.home_outlined)),
@@ -894,6 +933,13 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                       const Text('تفاصيل الطلب', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AQ.text)),
                       const SizedBox(height: 10),
                       Text(s(d['description']), style: const TextStyle(height: 1.6, color: AQ.text)),
+                      if (s(d['image_b64']).isNotEmpty) ...<Widget>[
+                        const SizedBox(height: 12),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.memory(base64Decode(s(d['image_b64']).split(',').last), height: 200, width: double.infinity, fit: BoxFit.cover),
+                        ),
+                      ],
                       const Divider(height: 26),
                       Row(children: <Widget>[const Icon(Icons.place_outlined, size: 18, color: AQ.teal), const SizedBox(width: 6), Text(s(d['area']))]),
                       if (s(d['address']).isNotEmpty) ...<Widget>[

@@ -17,7 +17,9 @@ const SCHEMA = [
     category TEXT NOT NULL, description TEXT NOT NULL, area TEXT NOT NULL DEFAULT '',
     address TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'matching',
     provider_id TEXT REFERENCES aq_users(id) ON DELETE SET NULL,
+    image_b64 TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`,
+  `ALTER TABLE aq_requests ADD COLUMN IF NOT EXISTS image_b64 TEXT NOT NULL DEFAULT ''`,
   `CREATE TABLE IF NOT EXISTS aq_offers (
     id TEXT PRIMARY KEY, request_id TEXT NOT NULL REFERENCES aq_requests(id) ON DELETE CASCADE,
     provider_id TEXT NOT NULL REFERENCES aq_users(id) ON DELETE CASCADE,
@@ -97,7 +99,7 @@ function memoryStore() {
     async bumpReset(email) { const r = resets.get(email); if (r) r.attempts += 1; },
     async delReset(email) { resets.delete(email); },
     async createRequest(r) {
-      const row = { ...r, status: 'matching', provider_id: null, created_at: now(), updated_at: now() };
+      const row = { ...r, status: 'matching', provider_id: null, image_b64: r.image_b64 || '', created_at: now(), updated_at: now() };
       requests.set(row.id, row); return { ...row };
     },
     async requestById(id) { const r = requests.get(id); return r ? { ...r } : null; },
@@ -209,7 +211,7 @@ function pgStore(url) {
   const iso = (d) => (d instanceof Date ? d.toISOString() : d);
   const q = (sql, p) => pool.query(sql, p);
   const U = (r) => (r ? { id: r.id, name: r.name, email: r.email, role: r.role, password_hash: r.password_hash, created_at: iso(r.created_at) } : null);
-  const R = (r) => (r ? { id: r.id, user_id: r.user_id, category: r.category, description: r.description, area: r.area, address: r.address, status: r.status, provider_id: r.provider_id, created_at: iso(r.created_at), updated_at: iso(r.updated_at) } : null);
+  const R = (r) => (r ? { id: r.id, user_id: r.user_id, category: r.category, description: r.description, area: r.area, address: r.address, status: r.status, provider_id: r.provider_id, image_b64: r.image_b64 || '', created_at: iso(r.created_at), updated_at: iso(r.updated_at) } : null);
   const O = (r) => (r ? { id: r.id, request_id: r.request_id, provider_id: r.provider_id, price: r.price, eta_minutes: r.eta_minutes, created_at: iso(r.created_at) } : null);
   return {
     kind: 'postgres',
@@ -243,7 +245,7 @@ function pgStore(url) {
     async bumpReset(email) { await q('UPDATE aq_resets SET attempts = attempts + 1 WHERE email=$1', [email]); },
     async delReset(email) { await q('DELETE FROM aq_resets WHERE email=$1', [email]); },
     async createRequest(r) {
-      const x = await q('INSERT INTO aq_requests (id,user_id,category,description,area,address) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *', [r.id, r.user_id, r.category, r.description, r.area, r.address]);
+      const x = await q('INSERT INTO aq_requests (id,user_id,category,description,area,address,image_b64) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *', [r.id, r.user_id, r.category, r.description, r.area, r.address, r.image_b64 || '']);
       return R(x.rows[0]);
     },
     async requestById(id) { return R((await q('SELECT * FROM aq_requests WHERE id=$1', [id])).rows[0]); },

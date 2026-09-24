@@ -51,11 +51,45 @@ jobs:
             sed -i "s/ext.kotlin_version = '[^']*'/ext.kotlin_version = '2.0.0'/g" android/build.gradle
           fi
 
-      - name: إضافة صلاحيات INTERNET + الإشعارات
+      - name: إضافة صلاحيات INTERNET + الإشعارات + الكاميرا
         working-directory: app
         run: |
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           echo "📄 المحتوى الأصلي:"
+          cat "$MANIFEST"
+          echo ""
+          # INTERNET
+          if ! grep -q "android.permission.INTERNET" "$MANIFEST"; then
+            sed -i 's|<application|<uses-permission android:name="android.permission.INTERNET"/>\n    <application|' "$MANIFEST"
+            echo "✅ INTERNET"
+          fi
+          # POST_NOTIFICATIONS
+          if ! grep -q "POST_NOTIFICATIONS" "$MANIFEST"; then
+            sed -i 's|<application|<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n    <application|' "$MANIFEST"
+            echo "✅ POST_NOTIFICATIONS"
+          fi
+          # SCHEDULE_EXACT_ALARM
+          if ! grep -q "SCHEDULE_EXACT_ALARM" "$MANIFEST"; then
+            sed -i 's|<application|<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>\n    <application|' "$MANIFEST"
+            echo "✅ SCHEDULE_EXACT_ALARM"
+          fi
+          # CAMERA
+          if ! grep -q "android.permission.CAMERA" "$MANIFEST"; then
+            sed -i 's|<application|<uses-permission android:name="android.permission.CAMERA"/>\n    <application|' "$MANIFEST"
+            echo "✅ CAMERA"
+          fi
+          # READ_MEDIA_IMAGES (Android 13+)
+          if ! grep -q "READ_MEDIA_IMAGES" "$MANIFEST"; then
+            sed -i 's|<application|<uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>\n    <application|' "$MANIFEST"
+            echo "✅ READ_MEDIA_IMAGES"
+          fi
+          # READ_EXTERNAL_STORAGE (Android 12-)
+          if ! grep -q "READ_EXTERNAL_STORAGE" "$MANIFEST"; then
+            sed -i 's|<application|<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>\n    <application|' "$MANIFEST"
+            echo "✅ READ_EXTERNAL_STORAGE"
+          fi
+          echo ""
+          echo "📄 بعد التعديل:"
           cat "$MANIFEST"
           echo ""
           if ! grep -q "android.permission.INTERNET" "$MANIFEST"; then
