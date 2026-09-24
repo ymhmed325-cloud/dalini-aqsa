@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'theme.dart';
+import 'logo.dart';
 import 'api.dart';
 import 'widgets.dart';
 import 'auth.dart';
@@ -86,7 +87,7 @@ class _SplashScreenState extends State<SplashScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              const Pulse(amount: 0.05, child: ScaleIn(child: AqLogo(size: 118))),
+              const Pulse(amount: 0.05, child: ScaleIn(child: DaliniLogo(size: 118))),
               const SizedBox(height: 26),
               const FadeSlide(
                 delay: Duration(milliseconds: 500),

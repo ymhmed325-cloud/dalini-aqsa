@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'theme.dart';
+import 'logo.dart';
 import 'api.dart';
 import 'widgets.dart';
 import 'customer.dart';
@@ -132,7 +133,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: const <Widget>[
-                      ScaleIn(child: AqLogo(size: 86)),
+                      ScaleIn(child: DaliniLogo(size: 86)),
                       SizedBox(height: 14),
                       FadeSlide(
                         delay: Duration(milliseconds: 250),

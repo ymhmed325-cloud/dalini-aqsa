@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'theme.dart';
+import 'logo.dart';
 import 'api.dart';
 import 'widgets.dart';
 import 'profile.dart';
@@ -64,7 +65,7 @@ class HomeTab extends StatelessWidget {
                 children: <Widget>[
                   Row(
                     children: const <Widget>[
-                      AqLogo(size: 42),
+                      DaliniLogo(size: 42),
                       SizedBox(width: 10),
                       Text('دليني الأقصى', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
                     ],
