@@ -97,7 +97,7 @@ class _ProfileTabState extends State<ProfileTab> {
               FadeSlide(delay: const Duration(milliseconds: 380), child: _Tile(icon: Icons.lock_outline, title: 'تغيير كلمة المرور', onTap: _changePassword)),
               FadeSlide(delay: const Duration(milliseconds: 460), child: _Tile(icon: Icons.logout_rounded, title: 'تسجيل الخروج', danger: true, onTap: _logout)),
               const SizedBox(height: 26),
-              const Text('دليني الأقصى • الإصدار 1.0', style: TextStyle(color: AQ.muted, fontSize: 12.5)),
+              const Text('دليني • الإصدار 1.0', style: TextStyle(color: AQ.muted, fontSize: 12.5)),
             ],
           ),
         ),

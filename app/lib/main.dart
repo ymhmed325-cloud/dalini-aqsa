@@ -26,7 +26,7 @@ class AqApp extends StatelessWidget {
     return MaterialApp(
       navigatorKey: navKey,
       debugShowCheckedModeBanner: false,
-      title: 'دليني الأقصى',
+      title: 'دليني',
       theme: AQ.theme(),
       locale: const Locale('ar'),
       supportedLocales: const <Locale>[Locale('ar')],
@@ -91,7 +91,7 @@ class _SplashScreenState extends State<SplashScreen> {
               const SizedBox(height: 26),
               const FadeSlide(
                 delay: Duration(milliseconds: 500),
-                child: Text('دليني الأقصى', style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900)),
+                child: Text('دليني', style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900)),
               ),
               const SizedBox(height: 8),
               const FadeSlide(

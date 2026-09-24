@@ -137,7 +137,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       SizedBox(height: 14),
                       FadeSlide(
                         delay: Duration(milliseconds: 250),
-                        child: Text('دليني الأقصى', style: TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900)),
+                        child: Text('دليني', style: TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900)),
                       ),
                       SizedBox(height: 4),
                       FadeSlide(

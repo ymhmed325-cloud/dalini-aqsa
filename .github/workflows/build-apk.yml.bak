@@ -1,0 +1,68 @@
+name: Build APK - دليني الأقصى
+
+on:
+  push:
+    branches: [ dalini-aqsa ]
+    paths:
+      - 'app/**'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: 'رابط الخادم (Backend URL)'
+        required: false
+        default: 'https://dalini-aqsa-gv2p.onrender.com'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: stable
+          cache: true
+
+      - name: إنشاء مجلدات المنصات (android/ios)
+        working-directory: app
+        run: flutter create . --platforms=android --org com.dalini.aqsa --project-name dalini_aqsa
+      - name: حذف ملف الاختبار الافتراضي
+        working-directory: app
+        run: rm -f test/widget_test.dart
+      - name: تبسيط ملف analysis_options
+        working-directory: app
+        run: printf "linter:\n  rules:\n" > analysis_options.yaml
+      - name: تحديث نسخة Kotlin
+        working-directory: app
+        run: sed -i "s/id \"org.jetbrains.kotlin.android\" version \"[^\"]*\"/id \"org.jetbrains.kotlin.android\" version \"1.9.24\"/" android/settings.gradle
+      - name: إضافة صلاحية الإنترنت
+        working-directory: app
+        run: sed -i "s#<uses-permission android:name=\"android.permission.INTERNET\"/>##; /<manifest /a\    <uses-permission android:name=\"android.permission.INTERNET\" />" android/app/src/main/AndroidManifest.xml
+
+      - name: تثبيت الحزم
+        working-directory: app
+        run: flutter pub get
+
+      - name: تحليل الكود
+        working-directory: app
+        run: flutter analyze --no-fatal-infos
+
+      - name: بناء APK (Release)
+        working-directory: app
+        run: |
+          flutter build apk --release \
+            --dart-define=API_URL=${{ github.event.inputs.api_url || 'https://dalini-aqsa-gv2p.onrender.com' }}
+
+      - name: رفع ملف التثبيت
+        uses: actions/upload-artifact@v4
+        with:
+          name: dalini-aqsa-apk
+          path: app/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30

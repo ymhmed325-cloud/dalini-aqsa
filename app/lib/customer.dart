@@ -5,6 +5,7 @@ import 'logo.dart';
 import 'api.dart';
 import 'widgets.dart';
 import 'profile.dart';
+import 'home_tab.dart';
 
 // ================= الإطار الرئيسي للزبون =================
 class CustomerShell extends StatefulWidget {
@@ -24,7 +25,7 @@ class _CustomerShellState extends State<CustomerShell> {
 
   @override
   Widget build(BuildContext context) {
-    final Widget page = tab == 0 ? HomeTab(onNew: newRequest) : (tab == 1 ? const OrdersTab() : const ProfileTab());
+    final Widget page = tab == 0 ? NewHomeTab(onNew: newRequest) : (tab == 1 ? const OrdersTab() : (tab == 2 ? const _ChatsTab() : const ProfileTab()));
     return Scaffold(
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 320),
@@ -37,6 +38,7 @@ class _CustomerShellState extends State<CustomerShell> {
         items: const <NavItem>[
           NavItem(Icons.home_rounded, 'الرئيسية'),
           NavItem(Icons.receipt_long_rounded, 'طلباتي'),
+          NavItem(Icons.chat_bubble_outline_rounded, 'المحادثات'),
           NavItem(Icons.person_rounded, 'حسابي'),
         ],
       ),
@@ -67,7 +69,7 @@ class HomeTab extends StatelessWidget {
                     children: const <Widget>[
                       DaliniLogo(size: 42),
                       SizedBox(width: 10),
-                      Text('دليني الأقصى', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
+                      Text('دليني', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
                     ],
                   ),
                   const Spacer(),
@@ -134,7 +136,7 @@ class HomeTab extends StatelessWidget {
             child: _ServiceCard(service: kServices[i], onTap: () => onNew(kServices[i].id)),
           ),
         ),
-        const SectionTitle('كيف يعمل دليني الأقصى؟'),
+        const SectionTitle('كيف يعمل دليني؟'),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 18),
           child: Row(
@@ -891,6 +893,28 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// تبويب المحادثات (مؤقت — قائمة فارغة)
+// ═══════════════════════════════════════════════════════════
+class _ChatsTab extends StatelessWidget {
+  const _ChatsTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: EdgeInsets.zero,
+      children: const <Widget>[
+        TabHeader(title: 'المحادثات', subtitle: 'تواصلك مع الفنيين'),
+        EmptyState(
+          icon: Icons.chat_bubble_outline_rounded,
+          title: 'لا توجد محادثات بعد',
+          subtitle: 'بعد قبول عرض فني، تُفتح محادثة تلقائياً هنا.',
+        ),
+      ],
     );
   }
 }

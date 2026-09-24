@@ -19,6 +19,7 @@ if (PROD && !process.env.CODE_SECRET) console.warn('[warn] CODE_SECRET غير م
 
 // ---------- ثوابت ----------
 const CATEGORIES = [
+  { id: 'emergency', name: 'طوارئ' }, { id: 'transport', name: 'نقل' },
   { id: 'electricity', name: 'كهرباء' }, { id: 'plumbing', name: 'سباكة' },
   { id: 'ac', name: 'تكييف' }, { id: 'appliances', name: 'صيانة أجهزة' },
   { id: 'cleaning', name: 'تنظيف' }, { id: 'cars', name: 'سيارات' },

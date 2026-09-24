@@ -49,12 +49,14 @@ class Service {
 }
 
 const List<Service> kServices = <Service>[
-  Service('electricity', 'كهرباء', Icons.bolt, Color(0xFFD99A1E)),
-  Service('plumbing', 'سباكة', Icons.water_drop, Color(0xFF2B7CC7)),
-  Service('ac', 'تكييف', Icons.ac_unit, Color(0xFF17A2B8)),
-  Service('appliances', 'صيانة أجهزة', Icons.build, Color(0xFF7A5BC7)),
-  Service('cleaning', 'تنظيف', Icons.cleaning_services, Color(0xFF2E9E5B)),
-  Service('cars', 'سيارات', Icons.directions_car, Color(0xFFC0503A)),
+  Service('emergency', 'طوارئ', Icons.emergency, Color(0xFFE74C3C)),
+  Service('cars', 'سيارات', Icons.directions_car, Color(0xFF2E7DD1)),
+  Service('transport', 'نقل', Icons.local_shipping, Color(0xFF3CB371)),
+  Service('cleaning', 'تنظيف', Icons.cleaning_services, Color(0xFF17A2B8)),
+  Service('appliances', 'صيانة', Icons.settings, Color(0xFF808B96)),
+  Service('ac', 'تكييف', Icons.ac_unit, Color(0xFF5DADE2)),
+  Service('plumbing', 'سباكة', Icons.water_drop, Color(0xFF16A085)),
+  Service('electricity', 'كهرباء', Icons.bolt, Color(0xFFF39C12)),
 ];
 
 Service serviceOf(String id) => kServices.firstWhere((x) => x.id == id, orElse: () => kServices.first);
