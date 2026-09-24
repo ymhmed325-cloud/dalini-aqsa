@@ -44,6 +44,20 @@ jobs:
             echo "✅ مجلد android موجود"
           fi
 
+      - name: تحديث إصدار Kotlin إلى 2.0.0
+        working-directory: app
+        run: |
+          # تحديث settings.gradle (الطريقة الحديثة)
+          if [ -f android/settings.gradle ]; then
+            sed -i "s/id \"org.jetbrains.kotlin.android\" version \"[^\"]*\"/id \"org.jetbrains.kotlin.android\" version \"2.0.0\"/g" android/settings.gradle
+            grep -n "kotlin" android/settings.gradle || true
+          fi
+          # تحديث build.gradle (الطريقة القديمة)
+          if [ -f android/build.gradle ]; then
+            sed -i "s/ext.kotlin_version = '[^']*'/ext.kotlin_version = '2.0.0'/g" android/build.gradle
+            grep -n "kotlin_version" android/build.gradle || true
+          fi
+
       - name: تحليل الكود
         working-directory: app
         run: flutter analyze --no-fatal-infos || true
