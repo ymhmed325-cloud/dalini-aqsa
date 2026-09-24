@@ -6,6 +6,9 @@ import 'api.dart';
 import 'widgets.dart';
 import 'profile.dart';
 import 'home_tab.dart';
+import 'drawer_menu.dart';
+import 'notifications_screen.dart';
+import 'city_picker.dart';
 
 // ================= الإطار الرئيسي للزبون =================
 class CustomerShell extends StatefulWidget {
@@ -17,6 +20,7 @@ class CustomerShell extends StatefulWidget {
 
 class _CustomerShellState extends State<CustomerShell> {
   int tab = 0;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   Future<void> newRequest([String? service]) async {
     final done = await Navigator.of(context).push<bool>(fadeRoute<bool>(NewRequestScreen(service: service)));
@@ -25,8 +29,10 @@ class _CustomerShellState extends State<CustomerShell> {
 
   @override
   Widget build(BuildContext context) {
-    final Widget page = tab == 0 ? NewHomeTab(onNew: newRequest) : (tab == 1 ? const OrdersTab() : (tab == 2 ? const _ChatsTab() : const ProfileTab()));
+    final Widget page = tab == 0 ? NewHomeTab(onNew: newRequest, onMenu: () => _scaffoldKey.currentState?.openDrawer(), onNotif: () => Navigator.of(context).push(fadeRoute<void>(const NotificationsScreen()))) : (tab == 1 ? const OrdersTab() : (tab == 2 ? const _ChatsTab() : const ProfileTab()));
     return Scaffold(
+      key: _scaffoldKey,
+      drawer: AppDrawer(onNew: newRequest, onGo: (i) => setState(() => tab = i)),
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 320),
         transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),

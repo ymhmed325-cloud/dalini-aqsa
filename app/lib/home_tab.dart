@@ -3,18 +3,18 @@ import 'theme.dart';
 import 'api.dart';
 import 'widgets.dart';
 
-// الرئيسية الجديدة: شريط بحث + بانر بغداد + شبكة 8 خدمات + خدمات قريبة
 class NewHomeTab extends StatelessWidget {
-  const NewHomeTab({super.key, required this.onNew});
+  const NewHomeTab({super.key, required this.onNew, required this.onMenu, required this.onNotif});
   final Future<void> Function([String?]) onNew;
+  final VoidCallback onMenu;
+  final VoidCallback onNotif;
 
   @override
   Widget build(BuildContext context) {
-    final name = s(Session.user?['name'], 'بك');
     return ListView(
       padding: EdgeInsets.zero,
       children: <Widget>[
-        _Hero(name: name),
+        _Hero(onMenu: onMenu, onNotif: onNotif),
         Transform.translate(
           offset: const Offset(0, -22),
           child: Padding(
@@ -35,10 +35,7 @@ class NewHomeTab extends StatelessWidget {
               mainAxisSpacing: 10,
               childAspectRatio: 0.85,
             ),
-            itemBuilder: (c, i) => _ServiceTile(
-              service: kServices[i],
-              onTap: () => onNew(kServices[i].id),
-            ),
+            itemBuilder: (c, i) => _ServiceTile(service: kServices[i], onTap: () => onNew(kServices[i].id)),
           ),
         ),
         const SectionTitle('خدمات قريبة منك'),
@@ -50,8 +47,9 @@ class NewHomeTab extends StatelessWidget {
 }
 
 class _Hero extends StatelessWidget {
-  const _Hero({required this.name});
-  final String name;
+  const _Hero({required this.onMenu, required this.onNotif});
+  final VoidCallback onMenu;
+  final VoidCallback onNotif;
 
   @override
   Widget build(BuildContext context) {
@@ -65,14 +63,14 @@ class _Hero extends StatelessWidget {
             children: <Widget>[
               Row(
                 children: <Widget>[
-                  const Icon(Icons.notifications_outlined, color: Colors.white, size: 26),
+                  IconButton(onPressed: onNotif, icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 26)),
                   const Spacer(),
-                  const Icon(Icons.menu, color: Colors.white, size: 26),
+                  IconButton(onPressed: onMenu, icon: const Icon(Icons.menu, color: Colors.white, size: 26)),
                 ],
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: const <Widget>[
+              const SizedBox(height: 8),
+              const Row(
+                children: <Widget>[
                   Icon(Icons.place, color: AQ.gold, size: 20),
                   SizedBox(width: 6),
                   Text('بغداد', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
@@ -136,10 +134,7 @@ class _ServiceTile extends StatelessWidget {
     return Pressable(
       onTap: onTap,
       child: Container(
-        decoration: BoxDecoration(
-          color: aa(service.color, 0.10),
-          borderRadius: BorderRadius.circular(16),
-        ),
+        decoration: BoxDecoration(color: aa(service.color, 0.10), borderRadius: BorderRadius.circular(16)),
         padding: const EdgeInsets.all(8),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -156,7 +151,6 @@ class _ServiceTile extends StatelessWidget {
 
 class _NearbyPlaceholder extends StatelessWidget {
   const _NearbyPlaceholder();
-
   @override
   Widget build(BuildContext context) {
     return Padding(
