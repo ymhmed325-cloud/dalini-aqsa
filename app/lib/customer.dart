@@ -10,6 +10,7 @@ import 'drawer_menu.dart';
 import 'notifications_screen.dart';
 import 'city_picker.dart';
 import 'rating_screen.dart';
+import 'chat_screen.dart';
 
 // ================= الإطار الرئيسي للزبون =================
 class CustomerShell extends StatefulWidget {
@@ -871,6 +872,14 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                         ),
                         StatusChip(status: st),
                       ]),
+                    ),
+                    const SizedBox(height: 12),
+                    AqButton(
+                      label: 'محادثة الفني',
+                      icon: Icons.chat_bubble_outline_rounded,
+                      onPressed: () => Navigator.of(context).push(fadeRoute<void>(
+                        ChatScreen(requestId: widget.id, otherName: s(provider['name'], 'الفني')),
+                      )),
                     ),
                     const SizedBox(height: 16),
                   ],

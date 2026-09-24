@@ -33,6 +33,12 @@ const SCHEMA = [
     provider_id TEXT NOT NULL REFERENCES aq_users(id) ON DELETE CASCADE,
     stars INTEGER NOT NULL, comment TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE (request_id))`,
+  `CREATE TABLE IF NOT EXISTS aq_messages (
+    id TEXT PRIMARY KEY, request_id TEXT NOT NULL REFERENCES aq_requests(id) ON DELETE CASCADE,
+    sender_id TEXT NOT NULL REFERENCES aq_users(id) ON DELETE CASCADE,
+    sender_role TEXT NOT NULL, text TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`,
+  `CREATE INDEX IF NOT EXISTS aq_messages_request_idx ON aq_messages (request_id)`,
   `CREATE INDEX IF NOT EXISTS aq_requests_user_idx ON aq_requests (user_id)`,
   `CREATE INDEX IF NOT EXISTS aq_requests_status_idx ON aq_requests (status)`,
   `CREATE INDEX IF NOT EXISTS aq_offers_request_idx ON aq_offers (request_id)`,
@@ -42,9 +48,11 @@ function dupError() { const e = new Error('duplicate'); e.code = 'DUP_EMAIL'; re
 
 const RATING = (r) => (r ? { id: r.id, request_id: r.request_id, customer_id: r.customer_id, provider_id: r.provider_id, stars: r.stars, comment: r.comment, created_at: (r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at) } : null);
 
+const MSG = (r) => (r ? { id: r.id, request_id: r.request_id, sender_id: r.sender_id, sender_role: r.sender_role, text: r.text, created_at: (r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at) } : null);
+
 function memoryStore() {
   const users = new Map(), byEmail = new Map(), sessions = new Map(), resets = new Map();
-  const requests = new Map(), offers = new Map(); const events = []; const ratings = new Map();
+  const requests = new Map(), offers = new Map(); const events = []; const ratings = new Map(); const messages = new Map();
   const now = () => new Date().toISOString();
   return {
     kind: 'memory',
@@ -132,6 +140,13 @@ function memoryStore() {
         }
       }
       return out;
+    },
+    async addMessage(m) {
+      const row = { ...m, created_at: now() }; messages.set(row.id, row); return { ...row };
+    },
+    async messagesFor(rid) {
+      return [...messages.values()].filter((x) => x.request_id === rid)
+        .sort((a, b) => a.created_at.localeCompare(b.created_at)).map((x) => ({ ...x }));
     },
     async addEvent(rid, status, actor, note) { events.push({ request_id: rid, status, actor, note: note || '', created_at: now() }); },
     async eventsFor(rid) { return events.filter((e) => e.request_id === rid).map(({ status, actor, note, created_at }) => ({ status, actor, note, created_at })); },
@@ -224,6 +239,13 @@ function pgStore(url) {
       const out = {};
       for (const x of r.rows) out[x.provider_id] = { avg: x.avg, count: x.count };
       return out;
+    },
+    async addMessage(m) {
+      const x = await q('INSERT INTO aq_messages (id,request_id,sender_id,sender_role,text) VALUES ($1,$2,$3,$4,$5) RETURNING *', [m.id, m.request_id, m.sender_id, m.sender_role, m.text]);
+      return MSG(x.rows[0]);
+    },
+    async messagesFor(rid) {
+      return (await q('SELECT * FROM aq_messages WHERE request_id=$1 ORDER BY created_at ASC LIMIT 500', [rid])).rows.map(MSG);
     },
     async addEvent(rid, status, actor, note) { await q('INSERT INTO aq_events (request_id,status,actor,note) VALUES ($1,$2,$3,$4)', [rid, status, actor, note || '']); },
     async eventsFor(rid) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'theme.dart';
 import 'api.dart';
 import 'widgets.dart';
+import 'chat_screen.dart';
 import 'profile.dart';
 
 // ================= إطار الفني =================
@@ -433,6 +434,15 @@ class _JobCard extends StatelessWidget {
               const SizedBox(width: 6),
               Expanded(child: Text(s(job['address']).isNotEmpty ? '${s(job['area'])} - ${s(job['address'])}' : s(job['area']), style: const TextStyle(height: 1.4))),
             ]),
+            const SizedBox(height: 10),
+            AqButton(
+              label: 'محادثة العميل',
+              icon: Icons.chat_bubble_outline_rounded,
+              gold: true,
+              onPressed: () => Navigator.of(context).push(fadeRoute<void>(
+                ChatScreen(requestId: s(job['id']), otherName: s(job['customer_name'], 'العميل')),
+              )),
+            ),
             if (next.isNotEmpty) ...<Widget>[
               const SizedBox(height: 14),
               AqButton(label: kActionAr[next] ?? 'التالي', icon: Icons.arrow_circle_left_outlined, busy: busy, onPressed: onAdvance),

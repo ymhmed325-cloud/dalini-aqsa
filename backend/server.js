@@ -329,6 +329,32 @@ route('GET', '/api/providers/me/rating-stats', [auth, only('provider')], async (
   return c.json(200, { stats });
 });
 
+// ---------- المحادثات ----------
+route('GET', '/api/requests/:id/messages', [auth], async (c) => {
+  const r = await getReq(c.params.id);
+  if (!r) return c.fail(404, 'الطلب غير موجود');
+  const isOwner = r.user_id === c.user.id;
+  const isProvider = r.provider_id === c.user.id;
+  if (!isOwner && !isProvider) return c.fail(404, 'الطلب غير موجود');
+  if (!r.provider_id) return c.fail(409, 'لم يُقبل أي عرض بعد');
+  const list = await store.messagesFor(r.id);
+  return c.json(200, { messages: list });
+});
+
+route('POST', '/api/requests/:id/messages', [auth, rl('msg', 60, 60e3, (c) => c.user.id)], async (c) => {
+  const r = await getReq(c.params.id);
+  if (!r) return c.fail(404, 'الطلب غير موجود');
+  const isOwner = r.user_id === c.user.id;
+  const isProvider = r.provider_id === c.user.id;
+  if (!isOwner && !isProvider) return c.fail(404, 'الطلب غير موجود');
+  if (!r.provider_id) return c.fail(409, 'لم يُقبل أي عرض بعد');
+  const text = String(c.body.text || '').trim();
+  if (text.length < 1 || text.length > 2000) return c.fail(400, 'اكتب رسالة (1-2000 حرف)');
+  const role = isOwner ? 'customer' : 'provider';
+  const m = await store.addMessage({ id: crypto.randomUUID(), request_id: r.id, sender_id: c.user.id, sender_role: role, text });
+  return c.json(201, { message: m });
+});
+
 // ---------- الخادم ----------
 function readBody(req) {
   return new Promise((resolve, reject) => {
