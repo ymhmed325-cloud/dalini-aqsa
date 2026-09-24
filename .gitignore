@@ -5,3 +5,9 @@ app/.dart_tool/
 app/.flutter-plugin-dependencies
 *.log
 .DS_Store
+
+# APK builds (محلية فقط)
+apk_new/
+apk_new_new/
+*.apk
+*.bak
