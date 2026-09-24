@@ -6,11 +6,13 @@ import 'logo.dart';
 import 'api.dart';
 import 'widgets.dart';
 import 'auth.dart';
+import 'notifications_service.dart';
 
 final GlobalKey<NavigatorState> navKey = GlobalKey<NavigatorState>();
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  NotifService.init();
   Api.onSessionEnd = () async {
     await Session.clear();
     navKey.currentState?.pushAndRemoveUntil(fadeRoute<void>(const AuthScreen()), (route) => false);

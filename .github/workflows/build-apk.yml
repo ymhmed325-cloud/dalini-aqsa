@@ -51,7 +51,7 @@ jobs:
             sed -i "s/ext.kotlin_version = '[^']*'/ext.kotlin_version = '2.0.0'/g" android/build.gradle
           fi
 
-      - name: إضافة صلاحية INTERNET
+      - name: إضافة صلاحيات INTERNET + الإشعارات
         working-directory: app
         run: |
           MANIFEST="android/app/src/main/AndroidManifest.xml"
@@ -60,9 +60,15 @@ jobs:
           echo ""
           if ! grep -q "android.permission.INTERNET" "$MANIFEST"; then
             sed -i 's|<application|<uses-permission android:name="android.permission.INTERNET"/>\n    <application|' "$MANIFEST"
-            echo "✅ تمت إضافة صلاحية INTERNET"
-          else
-            echo "ℹ️ الصلاحية موجودة"
+            echo "✅ تمت إضافة INTERNET"
+          fi
+          if ! grep -q "POST_NOTIFICATIONS" "$MANIFEST"; then
+            sed -i 's|<application|<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n    <application|' "$MANIFEST"
+            echo "✅ تمت إضافة POST_NOTIFICATIONS"
+          fi
+          if ! grep -q "SCHEDULE_EXACT_ALARM" "$MANIFEST"; then
+            sed -i 's|<application|<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>\n    <application|' "$MANIFEST"
+            echo "✅ تمت إضافة SCHEDULE_EXACT_ALARM"
           fi
           echo ""
           echo "📄 بعد التعديل:"

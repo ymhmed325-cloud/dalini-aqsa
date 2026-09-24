@@ -3,6 +3,7 @@ import 'theme.dart';
 import 'api.dart';
 import 'widgets.dart';
 import 'chat_screen.dart';
+import 'notifications_service.dart';
 import 'profile.dart';
 
 // ================= إطار الفني =================
@@ -50,14 +51,16 @@ class _AvailableTabState extends State<AvailableTab> {
   bool loading = true;
   String? error;
   List<Map<String, dynamic>> items = <Map<String, dynamic>>[];
+  int _lastCount = -1;
 
   @override
   void initState() {
     super.initState();
     load();
+    Timer.periodic(const Duration(seconds: 30), (t) => load(silent: true));
   }
 
-  Future<void> load() async {
+  Future<void> load({bool silent = false}) async {
     final r = await Api.get('/api/providers/requests');
     if (!mounted) return;
     setState(() {
@@ -65,6 +68,11 @@ class _AvailableTabState extends State<AvailableTab> {
       if (r.ok) {
         error = null;
         items = asList(r.map['requests']);
+        if (!silent && _lastCount >= 0 && items.length > _lastCount) {
+          final diff = items.length - _lastCount;
+          NotifService.show('طلب جديد', '$diff طلب جديد متاح الآن');
+        }
+        _lastCount = items.length;
       } else {
         error = r.error;
       }
