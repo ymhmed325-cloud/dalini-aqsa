@@ -16,6 +16,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # سياق secrets غير متاح مباشرة داخل step.if، لذلك نمرره عبر متغير env على مستوى الـjob
+      HAS_KEYSTORE: ${{ secrets.KEYSTORE_BASE64 != '' && secrets.KEYSTORE_PASSWORD != '' && secrets.KEY_ALIAS != '' && secrets.KEY_PASSWORD != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -59,7 +62,7 @@ jobs:
             sed -i "s/ext.kotlin_version = '[^']*'/ext.kotlin_version = '2.0.0'/g" android/build.gradle
           fi
 
-      - name: إضافة صلاحيات INTERNET + الإشعارات
+      - name: إضافة صلاحيات INTERNET + الإشعارات + الكاميرا
         working-directory: app
         run: |
           MANIFEST="android/app/src/main/AndroidManifest.xml"
@@ -78,6 +81,10 @@ jobs:
             sed -i 's|<application|<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>\n    <application|' "$MANIFEST"
             echo "✅ تمت إضافة SCHEDULE_EXACT_ALARM"
           fi
+          if ! grep -q "android.permission.CAMERA" "$MANIFEST"; then
+            sed -i 's|<application|<uses-permission android:name="android.permission.CAMERA"/>\n    <application|' "$MANIFEST"
+            echo "✅ تمت إضافة CAMERA"
+          fi
           echo ""
           echo "📄 بعد التعديل:"
           cat "$MANIFEST"
@@ -86,7 +93,7 @@ jobs:
         working-directory: app
         run: flutter analyze --no-fatal-infos || true
 
-      - name: تحديث إصدار Android SDK إلى 34
+      - name: تحديث إصدار Android SDK إلى 35
         working-directory: app
         run: |
           python3 << 'PYSCRIPT'
@@ -96,22 +103,42 @@ jobs:
           with open(gradle_file, 'r') as f:
               content = f.read()
            
-          # تحديث compileSdkVersion إلى 34
-          content = re.sub(r'compileSdkVersion\s+\d+', 'compileSdkVersion 34', content)
-          # تحديث targetSdkVersion إلى 34
-          content = re.sub(r'targetSdkVersion\s+\d+', 'targetSdkVersion 34', content)
+          # تحديث compileSdkVersion إلى 35 (مطلوب لـ flutter_local_notifications)
+          content = re.sub(r'compileSdkVersion\s+\d+', 'compileSdkVersion 35', content)
+          # تحديث targetSdkVersion إلى 35
+          content = re.sub(r'targetSdkVersion\s+\d+', 'targetSdkVersion 35', content)
           # تحديث minSdkVersion إلى 21
           content = re.sub(r'minSdkVersion\s+\d+', 'minSdkVersion 21', content)
            
           with open(gradle_file, 'w') as f:
               f.write(content)
            
-          print("✅ تم تحديث إصدارات Android SDK")
+          print("✅ تم تحديث إصدارات Android SDK إلى 35")
           PYSCRIPT
+
+      - name: تثبيت Android SDK 35
+        run: |
+          # البحث الآمن عن sdkmanager بغضّ النظر عن مساره (cmdline-tools/latest أو أي إصدار آخر)
+          SDKMAN=$(find "$ANDROID_HOME" -name sdkmanager -type f 2>/dev/null | head -1)
+
+          if [ -z "$SDKMAN" ]; then
+            echo "❌ لم يتم العثور على sdkmanager داخل $ANDROID_HOME"
+            find "$ANDROID_HOME" -maxdepth 4
+            exit 1
+          fi
+
+          echo "📦 استخدام sdkmanager: $SDKMAN"
+
+          yes | "$SDKMAN" --licenses > /dev/null || true
+          "$SDKMAN" "platforms;android-35" "build-tools;35.0.0"
+
+          echo "🔍 التحقق من التثبيت:"
+          ls "$ANDROID_HOME/platforms/android-35/android.jar"
+          ls "$ANDROID_HOME/build-tools/35.0.0/"
 
       - name: إعداد التوقيع (APK Signing)
         working-directory: app
-        if: vars.KEYSTORE_FILE != '' && vars.KEYSTORE_PASSWORD != '' && vars.KEY_ALIAS != '' && vars.KEY_PASSWORD != ''
+        if: env.HAS_KEYSTORE == 'true'
         run: |
           # فك تشفير الـ keystore من Base64 إلى ملف
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/dalini.jks
@@ -132,8 +159,11 @@ jobs:
           keyAlias=${{ secrets.KEY_ALIAS }}
           keyPassword=${{ secrets.KEY_PASSWORD }}
           EOF
+
+          # التحقق من إنشاء key.properties
+          [ -f "android/key.properties" ] && echo "✅ تم إنشاء key.properties" || exit 1
            
-          # إضافة التوقيع إلى build.gradle
+          # إضافة التوقيع إلى build.gradle (يعتمد على key.properties)
           python3 << 'PYSCRIPT'
           import re
            
@@ -141,20 +171,32 @@ jobs:
           with open(gradle_file, 'r') as f:
               content = f.read()
            
-          # البحث عن بداية تعريف signingConfigs أو android { block
-          signing_config = '''
-          signingConfigs {
+          # تحميل خصائص التوقيع من key.properties في أعلى الملف
+          keystore_loader = '''def keystoreProperties = new Properties()
+          def keystorePropertiesFile = rootProject.file('key.properties')
+          if (keystorePropertiesFile.exists()) {
+              keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+          }
+
+          '''
+          if 'keystoreProperties' not in content:
+              content = keystore_loader + content
+           
+          # إضافة signingConfigs بعد android {
+          signing_config = '''signingConfigs {
               release {
-                  keyAlias System.getenv("KEY_ALIAS") ?: ""
-                  keyPassword System.getenv("KEY_PASSWORD") ?: ""
-                  storeFile System.getenv("KEYSTORE_FILE") ? file(System.getenv("KEYSTORE_FILE")) : null
-                  storePassword System.getenv("KEYSTORE_PASSWORD") ?: ""
+                  if (keystorePropertiesFile.exists()) {
+                      keyAlias keystoreProperties['keyAlias']
+                      keyPassword keystoreProperties['keyPassword']
+                      storeFile file(keystoreProperties['storeFile'])
+                      storePassword keystoreProperties['storePassword']
+                  }
               }
           }
           '''
-           
-          # إذا لم يكن موجوداً، أضفه بعد android {
-          if 'signingConfigs' not in content:
+          # لا تستخدم "signingConfigs" كمعيار للفحص لأن القالب الافتراضي
+          # يحتوي على "signingConfigs.debug" مسبقاً داخل buildTypes.release
+          if 'signingConfigs {' not in content:
               content = re.sub(
                   r'android\s*\{',
                   'android {\n    ' + signing_config.strip(),
@@ -162,12 +204,20 @@ jobs:
                   count=1
               )
            
-          # تحديث buildTypes.release لاستخدام signingConfig
-          content = re.sub(
-              r'(buildTypes\s*\{\s*release\s*\{)',
-              r'\1\n            signingConfig signingConfigs.release',
-              content
-          )
+          # تحديث buildTypes.release لاستخدام signingConfigs.release
+          if 'signingConfig signingConfigs.debug' in content:
+              # القالب الافتراضي لـFlutter يوقّع الإصدار release بمفتاح debug
+              content = content.replace(
+                  'signingConfig signingConfigs.debug',
+                  'signingConfig signingConfigs.release'
+              )
+          elif 'signingConfig signingConfigs.release' not in content:
+              content = re.sub(
+                  r'(buildTypes\s*\{\s*release\s*\{)',
+                  r'\1\n            signingConfig signingConfigs.release',
+                  content,
+                  count=1
+              )
            
           with open(gradle_file, 'w') as f:
               f.write(content)
@@ -181,11 +231,6 @@ jobs:
 
       - name: بناء APK (مع التوقيع)
         working-directory: app
-        env:
-          KEYSTORE_FILE: ${{ vars.KEYSTORE_FILE || 'app/dalini.jks' }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           flutter build apk --release \
             --dart-define=API_URL=${{ github.event.inputs.api_url || 'https://dalini-aqsa-gv2p.onrender.com' }}
