@@ -86,7 +86,7 @@ jobs:
         working-directory: app
         run: flutter analyze --no-fatal-infos || true
 
-      - name: تحديث إصدار Android SDK إلى 35
+      - name: تحديث إصدار Android SDK إلى 34
         working-directory: app
         run: |
           python3 << 'PYSCRIPT'
@@ -96,10 +96,10 @@ jobs:
           with open(gradle_file, 'r') as f:
               content = f.read()
            
-          # تحديث compileSdkVersion إلى 35
-          content = re.sub(r'compileSdkVersion\s+\d+', 'compileSdkVersion 35', content)
-          # تحديث targetSdkVersion إلى 35
-          content = re.sub(r'targetSdkVersion\s+\d+', 'targetSdkVersion 35', content)
+          # تحديث compileSdkVersion إلى 34
+          content = re.sub(r'compileSdkVersion\s+\d+', 'compileSdkVersion 34', content)
+          # تحديث targetSdkVersion إلى 34
+          content = re.sub(r'targetSdkVersion\s+\d+', 'targetSdkVersion 34', content)
           # تحديث minSdkVersion إلى 21
           content = re.sub(r'minSdkVersion\s+\d+', 'minSdkVersion 21', content)
            
