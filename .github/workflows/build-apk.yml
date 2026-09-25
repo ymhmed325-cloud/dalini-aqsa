@@ -190,6 +190,10 @@ jobs:
           ls "$ANDROID_HOME/platforms/android-35/android.jar"
           ls "$ANDROID_HOME/build-tools/35.0.0/"
 
+      - name: توليد أيقونات التطبيق
+        working-directory: app
+        run: dart run flutter_launcher_icons
+
       - name: إعداد التوقيع (APK Signing)
         working-directory: app
         if: env.HAS_KEYSTORE == 'true'
@@ -205,10 +209,18 @@ jobs:
             echo "❌ فشل إنشاء ملف التوقيع"
             exit 1
           fi
+
+          # التحقق من أن الملف غير فارغ (فشل صامت محتمل في فك تشفير الـ Secret)
+          KEYSTORE_SIZE=$(wc -c < android/app/dalini.jks)
+          echo "📏 حجم ملف dalini.jks: ${KEYSTORE_SIZE} bytes"
+          if [ "$KEYSTORE_SIZE" -eq 0 ]; then
+            echo "❌ ملف dalini.jks فارغ (0 بايت) — تحقق من صحة قيمة الـ Secret KEYSTORE_BASE64"
+            exit 1
+          fi
            
           # إنشاء ملف key.properties
           cat > android/key.properties << EOF
-          storeFile=app/dalini.jks
+          storeFile=dalini.jks
           storePassword=${{ secrets.KEYSTORE_PASSWORD }}
           keyAlias=${{ secrets.KEY_ALIAS }}
           keyPassword=${{ secrets.KEY_PASSWORD }}
@@ -297,9 +309,18 @@ jobs:
           print("✅ تم إضافة التوقيع إلى build.gradle")
           PYSCRIPT
 
-      - name: توليد أيقونات التطبيق
+      - name: التحقق من ملف التوقيع قبل البناء
         working-directory: app
-        run: dart run flutter_launcher_icons
+        if: env.HAS_KEYSTORE == 'true'
+        run: |
+          echo "🔍 التحقق من وجود ملف التوقيع قبل البناء:"
+          ls -la android/app/dalini.jks || exit 1
+          echo "---"
+          echo "📄 محتوى key.properties:"
+          cat android/key.properties
+          echo "---"
+          echo "📁 محتويات android/:"
+          ls -la android/
 
       - name: بناء APK (مع التوقيع)
         working-directory: app
