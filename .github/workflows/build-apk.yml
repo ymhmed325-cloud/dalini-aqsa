@@ -62,6 +62,26 @@ jobs:
             sed -i "s/ext.kotlin_version = '[^']*'/ext.kotlin_version = '2.0.0'/g" android/build.gradle
           fi
 
+      - name: ترقية Android Gradle Plugin وGradle Wrapper (مطلوبة لدعم compileSdk 35)
+        working-directory: app
+        run: |
+          # القالب الافتراضي لفلاتر 3.24 يستخدم AGP 7.3.0 وGradle 7.6.3، وهما إصداران
+          # قديمان جداً ولا يدعمان compileSdk 35 (يسبب فشل AAPT2 عند البناء).
+          # نرفعهما إلى الحد الأدنى الموصى به رسمياً لدعم compileSdk 35 دون كسر Kotlin 2.0.0.
+          if [ -f android/settings.gradle ]; then
+            sed -i "s/id \"com.android.application\" version \"[^\"]*\"/id \"com.android.application\" version \"8.6.0\"/g" android/settings.gradle
+            echo "📄 settings.gradle بعد الترقية:"
+            grep 'version' android/settings.gradle
+          fi
+
+          GRADLE_WRAPPER="android/gradle/wrapper/gradle-wrapper.properties"
+          if [ -f "$GRADLE_WRAPPER" ]; then
+            # نستبدل رقم إصدار Gradle فقط للحفاظ على تنسيق الملف (بما في ذلك \: المُهرَّب)
+            sed -i -E "s/gradle-[0-9]+(\.[0-9]+)*-all\.zip/gradle-8.7-all.zip/" "$GRADLE_WRAPPER"
+            echo "📄 gradle-wrapper.properties بعد الترقية:"
+            cat "$GRADLE_WRAPPER"
+          fi
+
       - name: إضافة صلاحيات INTERNET + الإشعارات + الكاميرا
         working-directory: app
         run: |
@@ -103,17 +123,51 @@ jobs:
           with open(gradle_file, 'r') as f:
               content = f.read()
            
-          # تحديث compileSdkVersion إلى 35 (مطلوب لـ flutter_local_notifications)
-          content = re.sub(r'compileSdkVersion\s+\d+', 'compileSdkVersion 35', content)
-          # تحديث targetSdkVersion إلى 35
-          content = re.sub(r'targetSdkVersion\s+\d+', 'targetSdkVersion 35', content)
-          # تحديث minSdkVersion إلى 21
-          content = re.sub(r'minSdkVersion\s+\d+', 'minSdkVersion 21', content)
+          # تحديث compileSdk/targetSdk/minSdk إلى القيم المطلوبة.
+          # ملاحظة مهمة: قوالب Flutter 3.24+ لا تستخدم الصيغة القديمة
+          # "compileSdkVersion 34" بل صيغة إسناد الخاصية الحديثة
+          # "compileSdk = flutter.compileSdkVersion"، لذلك يجب أن يدعم
+          # الـ regex كلا الصيغتين (القديمة والحديثة) وإلا يبقى التحديث
+          # بلا أي أثر فعلي على قيمة compileSdk الحقيقية.
+          content = re.sub(r'(compileSdk(?:Version)?\s*=?\s*)\S+', r'\g<1>35', content)
+          content = re.sub(r'(targetSdk(?:Version)?\s*=?\s*)\S+', r'\g<1>35', content)
+          content = re.sub(r'(minSdk(?:Version)?\s*=?\s*)\S+', r'\g<1>21', content)
+
+          # تفعيل Core Library Desugaring: مكتبة flutter_local_notifications
+          # تفرض على أي تطبيق يستخدمها تفعيل coreLibraryDesugaringEnabled
+          # وإضافة تبعية desugar_jdk_libs، وإلا يفشل البناء بخطأ
+          # "requires core library desugaring to be enabled for :app"
+          if 'coreLibraryDesugaringEnabled' not in content:
+              if re.search(r'compileOptions\s*\{', content):
+                  content = re.sub(
+                      r'(compileOptions\s*\{)',
+                      r'\1\n        coreLibraryDesugaringEnabled true',
+                      content,
+                      count=1
+                  )
+              else:
+                  content = re.sub(
+                      r'(android\s*\{)',
+                      r'\1\n    compileOptions {\n        coreLibraryDesugaringEnabled true\n    }',
+                      content,
+                      count=1
+                  )
+
+          if 'coreLibraryDesugaring ' not in content:
+              if re.search(r'dependencies\s*\{', content):
+                  content = re.sub(
+                      r'(dependencies\s*\{)',
+                      r"\1\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'",
+                      content,
+                      count=1
+                  )
+              else:
+                  content = content.rstrip() + "\n\ndependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'\n}\n"
            
           with open(gradle_file, 'w') as f:
               f.write(content)
            
-          print("✅ تم تحديث إصدارات Android SDK إلى 35")
+          print("✅ تم تحديث إصدارات Android SDK إلى 35 وتفعيل Core Library Desugaring")
           PYSCRIPT
 
       - name: تثبيت Android SDK 35
@@ -171,7 +225,7 @@ jobs:
           with open(gradle_file, 'r') as f:
               content = f.read()
            
-          # تحميل خصائص التوقيع من key.properties في أعلى الملف
+          # تحميل خصائص التوقيع من key.properties
           keystore_loader = '''def keystoreProperties = new Properties()
           def keystorePropertiesFile = rootProject.file('key.properties')
           if (keystorePropertiesFile.exists()) {
@@ -179,8 +233,21 @@ jobs:
           }
 
           '''
+          # مهم جداً: قوالب Flutter الحديثة (3.24+) تبدأ الملف بكتلة
+          # "plugins {}"، وGradle يمنع وجود أي كود قبلها عدا
+          # buildscript {} / pluginManagement {} / plugins {} أخرى.
+          # لذلك يجب إدراج keystore_loader بعد نهاية كتلة plugins {}
+          # مباشرة، وليس في بداية الملف كما كان سابقاً (وهذا بالتحديد
+          # سبب فشل البناء بخطأ "line 7: only buildscript {},
+          # pluginManagement {} and other plugins {} ... are allowed").
           if 'keystoreProperties' not in content:
-              content = keystore_loader + content
+              plugins_match = re.search(r'plugins\s*\{[^}]*\}', content)
+              if plugins_match:
+                  insert_pos = plugins_match.end()
+                  content = content[:insert_pos] + '\n\n' + keystore_loader + content[insert_pos:]
+              else:
+                  # نمط قديم بدون plugins {} في أعلى الملف - يمكن الإدراج في البداية بأمان
+                  content = keystore_loader + content
            
           # إضافة signingConfigs بعد android {
           signing_config = '''signingConfigs {
@@ -205,13 +272,18 @@ jobs:
               )
            
           # تحديث buildTypes.release لاستخدام signingConfigs.release
-          if 'signingConfig signingConfigs.debug' in content:
+          # يدعم كلا الصيغتين: "signingConfig signingConfigs.debug" (قديمة)
+          # و"signingConfig = signingConfigs.debug" (حديثة، قوالب Flutter 3.24+).
+          # بدون هذا الدعم، السطر القديم يبقى كما هو (لأن الفحص النصي القديم
+          # لا يطابق صيغة "=")، وبما أنه يُنفَّذ بعد السطر الجديد المُضاف،
+          # يبقى التوقيع الفعلي على مفتاح debug رغم إضافة signingConfigs.release
+          debug_signing_pattern = re.compile(r'signingConfig\s*=?\s*signingConfigs\.debug')
+          release_signing_pattern = re.compile(r'signingConfig\s*=?\s*signingConfigs\.release')
+
+          if debug_signing_pattern.search(content):
               # القالب الافتراضي لـFlutter يوقّع الإصدار release بمفتاح debug
-              content = content.replace(
-                  'signingConfig signingConfigs.debug',
-                  'signingConfig signingConfigs.release'
-              )
-          elif 'signingConfig signingConfigs.release' not in content:
+              content = debug_signing_pattern.sub('signingConfig signingConfigs.release', content)
+          elif not release_signing_pattern.search(content):
               content = re.sub(
                   r'(buildTypes\s*\{\s*release\s*\{)',
                   r'\1\n            signingConfig signingConfigs.release',
