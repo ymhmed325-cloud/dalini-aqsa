@@ -90,6 +90,15 @@ jobs:
         working-directory: app
         run: dart run flutter_launcher_icons
 
+      - name: تثبيت Android SDK 35
+        run: |
+          echo "🔨 تثبيت SDK 35..."
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" > /dev/null 2>&1 || true
+          echo "✅ تم"
+          ls $ANDROID_HOME/platforms/
+          ls $ANDROID_HOME/build-tools/
+
       - name: بناء APK
         working-directory: app
         run: |
