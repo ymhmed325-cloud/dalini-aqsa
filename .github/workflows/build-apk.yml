@@ -16,6 +16,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # سياق secrets غير متاح مباشرة داخل step.if، لذلك نمرره عبر متغير env على مستوى الـjob
+      HAS_KEYSTORE: ${{ secrets.KEYSTORE_BASE64 != '' && secrets.KEYSTORE_PASSWORD != '' && secrets.KEY_ALIAS != '' && secrets.KEY_PASSWORD != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -135,7 +138,7 @@ jobs:
 
       - name: إعداد التوقيع (APK Signing)
         working-directory: app
-        if: secrets.KEYSTORE_BASE64 != '' && secrets.KEYSTORE_PASSWORD != '' && secrets.KEY_ALIAS != '' && secrets.KEY_PASSWORD != ''
+        if: env.HAS_KEYSTORE == 'true'
         run: |
           # فك تشفير الـ keystore من Base64 إلى ملف
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/dalini.jks
