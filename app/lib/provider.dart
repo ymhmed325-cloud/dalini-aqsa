@@ -7,6 +7,7 @@ import 'widgets.dart';
 import 'chat_screen.dart';
 import 'notifications_service.dart';
 import 'profile.dart';
+import 'dart:convert';
 
 // ================= إطار الفني =================
 class ProviderShell extends StatefulWidget {
@@ -164,6 +165,19 @@ class _AvailableCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(s(item['description']), maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AQ.text, height: 1.5)),
+            if (s(item['image_b64'] ?? '').isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.memory(
+                    base64Decode(s(item['image_b64'])),
+                    height: 150,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
             const SizedBox(height: 10),
             Row(children: <Widget>[
               const Icon(Icons.place_outlined, size: 16, color: AQ.teal),
