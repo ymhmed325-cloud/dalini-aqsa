@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'theme.dart';
 import 'logo.dart';
 import 'api.dart';
@@ -257,6 +259,7 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
   final TextEditingController address = TextEditingController();
   bool busy = false;
   bool done = false;
+  String? imageBas64;  // لتخزين الصورة المختارة بصيغة base64
 
   @override
   void initState() {
@@ -270,6 +273,25 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
     area.dispose();
     address.dispose();
     super.dispose();
+  }
+
+  // اختيار صورة من المعرض وتحويلها إلى base64
+  Future<void> _pickImage() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+      
+      if (image != null && mounted) {
+        // قراءة ملف الصورة وتحويله إلى base64
+        final bytes = await image.readAsBytes();
+        final base64String = base64Encode(bytes);
+        
+        setState(() => imageBas64 = base64String);
+        showAqSnack(context, 'تم اختيار الصورة بنجاح');
+      }
+    } catch (e) {
+      showAqSnack(context, 'تعذر اختيار الصورة', error: true);
+    }
   }
 
   Future<void> send() async {
@@ -291,6 +313,7 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
       'description': desc.text.trim(),
       'area': area.text.trim(),
       'address': address.text.trim(),
+      if (imageBas64 != null) 'image_b64': imageBas64,
     });
     if (!mounted) return;
     setState(() => busy = false);
@@ -427,6 +450,14 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
                   ],
                 ),
                 const SizedBox(height: 22),
+                // زر اختيار الصورة (اختياري)
+                AqButton(
+                  label: imageBas64 != null ? '✅ صورة مختارة' : '📷 أضف صورة (اختياري)',
+                  icon: imageBas64 != null ? Icons.check_circle : Icons.image_outlined,
+                  onPressed: _pickImage,
+                  gold: imageBas64 != null,
+                ),
+                const SizedBox(height: 14),
                 AqButton(label: 'إرسال الطلب', icon: Icons.send_rounded, busy: busy, onPressed: send),
                 const SizedBox(height: 30),
               ],
@@ -894,6 +925,19 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                       const Text('تفاصيل الطلب', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AQ.text)),
                       const SizedBox(height: 10),
                       Text(s(d['description']), style: const TextStyle(height: 1.6, color: AQ.text)),
+                       if (s(d['image_b64'] ?? '').isNotEmpty)
+                         Padding(
+                           padding: const EdgeInsets.only(top: 12),
+                           child: ClipRRect(
+                             borderRadius: BorderRadius.circular(10),
+                             child: Image.memory(
+                               base64Decode(s(d['image_b64'])),
+                               height: 200,
+                               width: double.infinity,
+                               fit: BoxFit.cover,
+                             ),
+                           ),
+                         ),
                       const Divider(height: 26),
                       Row(children: <Widget>[const Icon(Icons.place_outlined, size: 18, color: AQ.teal), const SizedBox(width: 6), Text(s(d['area']))]),
                       if (s(d['address']).isNotEmpty) ...<Widget>[

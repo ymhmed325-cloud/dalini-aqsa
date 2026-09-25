@@ -86,12 +86,106 @@ jobs:
         working-directory: app
         run: flutter analyze --no-fatal-infos || true
 
+      - name: تحديث إصدار Android SDK إلى 35
+        working-directory: app
+        run: |
+          python3 << 'PYSCRIPT'
+          import re
+          gradle_file = 'android/app/build.gradle'
+           
+          with open(gradle_file, 'r') as f:
+              content = f.read()
+           
+          # تحديث compileSdkVersion إلى 35
+          content = re.sub(r'compileSdkVersion\s+\d+', 'compileSdkVersion 35', content)
+          # تحديث targetSdkVersion إلى 35
+          content = re.sub(r'targetSdkVersion\s+\d+', 'targetSdkVersion 35', content)
+          # تحديث minSdkVersion إلى 21
+          content = re.sub(r'minSdkVersion\s+\d+', 'minSdkVersion 21', content)
+           
+          with open(gradle_file, 'w') as f:
+              f.write(content)
+           
+          print("✅ تم تحديث إصدارات Android SDK")
+          PYSCRIPT
+
+      - name: إعداد التوقيع (APK Signing)
+        working-directory: app
+        if: vars.KEYSTORE_FILE != '' && vars.KEYSTORE_PASSWORD != '' && vars.KEY_ALIAS != '' && vars.KEY_PASSWORD != ''
+        run: |
+          # فك تشفير الـ keystore من Base64 إلى ملف
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/dalini.jks
+           
+          # التحقق من الملف
+          if [ -f "android/app/dalini.jks" ]; then
+            echo "✅ تم إنشاء ملف التوقيع بنجاح"
+            ls -lh android/app/dalini.jks
+          else
+            echo "❌ فشل إنشاء ملف التوقيع"
+            exit 1
+          fi
+           
+          # إنشاء ملف key.properties
+          cat > android/key.properties << EOF
+          storeFile=app/dalini.jks
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          EOF
+           
+          # إضافة التوقيع إلى build.gradle
+          python3 << 'PYSCRIPT'
+          import re
+           
+          gradle_file = 'android/app/build.gradle'
+          with open(gradle_file, 'r') as f:
+              content = f.read()
+           
+          # البحث عن بداية تعريف signingConfigs أو android { block
+          signing_config = '''
+          signingConfigs {
+              release {
+                  keyAlias System.getenv("KEY_ALIAS") ?: ""
+                  keyPassword System.getenv("KEY_PASSWORD") ?: ""
+                  storeFile System.getenv("KEYSTORE_FILE") ? file(System.getenv("KEYSTORE_FILE")) : null
+                  storePassword System.getenv("KEYSTORE_PASSWORD") ?: ""
+              }
+          }
+          '''
+           
+          # إذا لم يكن موجوداً، أضفه بعد android {
+          if 'signingConfigs' not in content:
+              content = re.sub(
+                  r'android\s*\{',
+                  'android {\n    ' + signing_config.strip(),
+                  content,
+                  count=1
+              )
+           
+          # تحديث buildTypes.release لاستخدام signingConfig
+          content = re.sub(
+              r'(buildTypes\s*\{\s*release\s*\{)',
+              r'\1\n            signingConfig signingConfigs.release',
+              content
+          )
+           
+          with open(gradle_file, 'w') as f:
+              f.write(content)
+           
+          print("✅ تم إضافة التوقيع إلى build.gradle")
+          PYSCRIPT
+
       - name: توليد أيقونات التطبيق
         working-directory: app
         run: dart run flutter_launcher_icons
 
-      - name: بناء APK
+      - name: بناء APK (مع التوقيع)
         working-directory: app
+        env:
+          KEYSTORE_FILE: ${{ vars.KEYSTORE_FILE || 'app/dalini.jks' }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           flutter build apk --release \
             --dart-define=API_URL=${{ github.event.inputs.api_url || 'https://dalini-aqsa-gv2p.onrender.com' }}
