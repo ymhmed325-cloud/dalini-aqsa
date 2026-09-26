@@ -12,3 +12,6 @@ apk_new_new/
 *.apk
 *.bak
 .aider*
+ai_agent.py
+auto_agent.py
+test_api.py
