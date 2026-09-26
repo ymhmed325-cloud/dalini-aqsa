@@ -46,13 +46,6 @@ const SCHEMA = [
     verify_status TEXT NOT NULL DEFAULT 'none',
     expires_at TIMESTAMPTZ,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`,
-  `CREATE TABLE IF NOT EXISTS aq_subscriptions (
-    user_id TEXT PRIMARY KEY REFERENCES aq_users(id) ON DELETE CASCADE,
-    plan TEXT NOT NULL DEFAULT 'free',
-    verified BOOLEAN NOT NULL DEFAULT FALSE,
-    verify_status TEXT NOT NULL DEFAULT 'none',
-    expires_at TIMESTAMPTZ,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`,
   `CREATE INDEX IF NOT EXISTS aq_requests_user_idx ON aq_requests (user_id)`,
   `CREATE INDEX IF NOT EXISTS aq_requests_status_idx ON aq_requests (status)`,
   `CREATE INDEX IF NOT EXISTS aq_offers_request_idx ON aq_offers (request_id)`,
@@ -68,7 +61,7 @@ const SUB = (r) => (r ? { user_id: r.user_id, plan: r.plan, verified: r.verified
 
 function memoryStore() {
   const users = new Map(), byEmail = new Map(), sessions = new Map(), resets = new Map();
-  const requests = new Map(), offers = new Map(); const events = []; const ratings = new Map(); const messages = new Map(); const subs = new Map(); const subs = new Map();
+  const requests = new Map(), offers = new Map(); const events = []; const ratings = new Map(); const messages = new Map(); const subs = new Map();
   const now = () => new Date().toISOString();
   return {
     kind: 'memory',
@@ -163,21 +156,6 @@ function memoryStore() {
     async messagesFor(rid) {
       return [...messages.values()].filter((x) => x.request_id === rid)
         .sort((a, b) => a.created_at.localeCompare(b.created_at)).map((x) => ({ ...x }));
-    },
-    async getSub(uid) {
-      const s = subs.get(uid);
-      return s ? { ...s } : { user_id: uid, plan: 'free', verified: false, verify_status: 'none', expires_at: null };
-    },
-    async upsertSub(uid, patch) {
-      const cur = subs.get(uid) || { user_id: uid, plan: 'free', verified: false, verify_status: 'none', expires_at: null };
-      const row = { ...cur, ...patch, updated_at: now() };
-      subs.set(uid, row);
-      return { ...row };
-    },
-    async verifiedMap(ids) {
-      const out = {};
-      for (const id of ids) { const s = subs.get(id); out[id] = s ? s.verified : false; }
-      return out;
     },
     async getSub(uid) {
       const s = subs.get(uid);

@@ -387,11 +387,25 @@ route('POST', '/api/providers/me/verify', [auth, only('provider')], async (c) =>
 });
 
 // ---------- الخادم ----------
+// الحد الأقصى لحجم جسم الطلب: 3 ميغابايت (يكفي لصورة واحدة بصيغة base64 مع بيانات الطلب).
+const MAX_BODY_BYTES = 3 * 1024 * 1024;
 function readBody(req) {
   return new Promise((resolve, reject) => {
-    let size = 0; const chunks = [];
-    req.on('data', (d) => { size += d.length; if (size > 65536) { reject(Object.assign(new Error('big'), { status: 413 })); req.destroy(); } else chunks.push(d); });
+    let size = 0; let rejected = false; const chunks = [];
+    req.on('data', (d) => {
+      if (rejected) return; // تجاهل أي بيانات تصل بعد الرفض، دون تجميعها في الذاكرة
+      size += d.length;
+      if (size > MAX_BODY_BYTES) {
+        rejected = true;
+        // نرفض الوعد فقط، ولا نقطع الاتصال (req.destroy) هنا كي يصل ردّ 413 للعميل
+        // قبل إغلاق الاتصال، بدل أن يظهر للعميل كخطأ بوابة (502) بلا رسالة واضحة.
+        reject(Object.assign(new Error('big'), { status: 413 }));
+        return;
+      }
+      chunks.push(d);
+    });
     req.on('end', () => {
+      if (rejected) return;
       if (!chunks.length) return resolve({});
       try { const o = JSON.parse(Buffer.concat(chunks).toString('utf8')); resolve(o && typeof o === 'object' && !Array.isArray(o) ? o : {}); }
       catch (e) { reject(Object.assign(new Error('bad json'), { status: 400 })); }
@@ -402,11 +416,14 @@ function readBody(req) {
 
 const server = http.createServer(async (req, res) => {
   const c = { req, res, user: null, body: {}, params: {}, ip: '' };
-  c.json = (status, obj) => {
-    res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+  c.json = (status, obj, opts) => {
+    const headers = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
+    // إغلاق الاتصال بعد إرسال الرد مباشرة (مثلاً بعد رفض طلب تجاوز الحجم المسموح)
+    if (opts && opts.close) headers.Connection = 'close';
+    res.writeHead(status, headers);
     res.end(JSON.stringify(obj));
   };
-  c.fail = (status, msg) => c.json(status, { error: msg });
+  c.fail = (status, msg, opts) => c.json(status, { error: msg }, opts);
   try {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -428,7 +445,8 @@ const server = http.createServer(async (req, res) => {
       await match.handler(c);
     }
   } catch (e) {
-    if (e.status === 400 || e.status === 413) return c.fail(e.status, e.status === 413 ? 'الطلب كبير جداً' : 'صيغة الطلب غير صحيحة');
+    if (e.status === 413) return c.fail(413, 'حجم الطلب كبير جداً (الحد الأقصى 3 ميغابايت)', { close: true });
+    if (e.status === 400) return c.fail(400, 'صيغة الطلب غير صحيحة');
     console.error('[error]', req.method, req.url, e && e.message);
     if (!res.headersSent) c.fail(500, 'حدث خطأ في الخادم، حاول لاحقاً');
   }
