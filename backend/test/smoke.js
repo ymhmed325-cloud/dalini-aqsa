@@ -161,6 +161,24 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     r = await call('POST', `/api/requests/${req2}/cancel`, {}, cust);
     check('الزبون يلغي طلبه', r.status === 200 && r.data.request.status === 'cancelled', r);
 
+    console.log('— اشتراك الفنيين والتوثيق');
+    r = await call('GET', '/api/providers/me/subscription');
+    check('بدون توكن = 401', r.status === 401, r);
+    r = await call('GET', '/api/providers/me/subscription', null, cust);
+    check('الزبون لا يصل لمسار اشتراك الفنيين (403)', r.status === 403, r);
+    r = await call('POST', '/api/auth/register', { name: 'فني ثالث', email: 'p3@example.com', password: 'Pass12345', role: 'provider' });
+    const p3 = r.data.token;
+    r = await call('GET', '/api/providers/me/subscription', null, p3);
+    check('الاشتراك الافتراضي مجاني', r.status === 200 && r.data.subscription.plan === 'free' && r.data.plan.name === 'مجاني', r);
+    r = await call('POST', '/api/providers/me/subscribe', { plan: 'غير-موجودة' }, p3);
+    check('رفض باقة غير معروفة', r.status === 400, r);
+    r = await call('POST', '/api/providers/me/subscribe', { plan: 'pro' }, p3);
+    check('الاشتراك بباقة احترافي', r.status === 200 && r.data.subscription.plan === 'pro', r);
+    r = await call('GET', '/api/providers/me/subscription', null, p3);
+    check('الباقة الجديدة محفوظة بعد إعادة القراءة', r.status === 200 && r.data.subscription.plan === 'pro', r);
+    r = await call('POST', '/api/providers/me/verify', {}, p3);
+    check('طلب التوثيق يُقبل', r.status === 200 && r.data.subscription.verify_status === 'pending', r);
+
     console.log('— الحساب');
     r = await call('PUT', '/api/profile', { name: 'علي الجديد' }, cust);
     check('تعديل الاسم', r.status === 200 && r.data.user.name === 'علي الجديد', r);
@@ -177,6 +195,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     let hit429 = false;
     for (let i = 0; i < 12; i++) { r = await call('POST', '/api/auth/login', { email: 'p1@example.com', password: 'wrongwrong1' }); if (r.status === 429) hit429 = true; }
     check('تحديد محاولات الدخول (429)', hit429);
+
+    console.log('— حجم الطلب (رفع الصور)');
+    // أكبر من الحد القديم (64 كيلوبايت) وأصغر من الحد الجديد (3 ميغابايت): يجب أن ينجح.
+    const midSize = 'a'.repeat(500 * 1024);
+    r = await call('POST', '/api/auth/register', { name: 'صاحب صورة', email: 'img-ok@example.com', password: 'Pass12345', extra: midSize });
+    check('طلب 500 كيلوبايت (أكبر من الحد القديم) ينجح الآن', r.status === 201, r);
+    // أكبر من الحد الجديد (3 ميغابايت): يجب أن يصل رد 413 صريح، وليس انقطاع اتصال (502).
+    const overSize = 'a'.repeat(4 * 1024 * 1024);
+    r = await call('POST', '/api/auth/register', { name: 'صورة كبيرة', email: 'img-big@example.com', password: 'Pass12345', extra: overSize });
+    check('طلب أكبر من 3 ميغابايت يُرفض بردّ 413 واضح', r.status === 413, r);
   } catch (e) {
     failed.push('استثناء: ' + e.message); console.error(e);
   } finally {
