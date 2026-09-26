@@ -1,347 +1,166 @@
-name: Build APK - دليني
+name: Build Flutter APK
 
 on:
   push:
-    branches: [ dalini-aqsa ]
-    paths:
-      - 'app/**'
-      - '.github/workflows/build-apk.yml'
+    branches: [ main, master ]
   workflow_dispatch:
-    inputs:
-      api_url:
-        description: 'رابط الخادم'
-        required: false
-        default: 'https://dalini-aqsa-gv2p.onrender.com'
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      # سياق secrets غير متاح مباشرة داخل step.if، لذلك نمرره عبر متغير env على مستوى الـjob
-      HAS_KEYSTORE: ${{ secrets.KEYSTORE_BASE64 != '' && secrets.KEYSTORE_PASSWORD != '' && secrets.KEY_ALIAS != '' && secrets.KEY_PASSWORD != '' }}
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          distribution: 'temurin'
           java-version: '17'
 
-      - uses: subosito/flutter-action@v2
+      - name: Set up Flutter 3.24.0
+        uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.0'
-          channel: stable
+          channel: 'stable'
           cache: true
 
-      - name: تثبيت الحزم
-        working-directory: app
-        run: flutter pub get
-
-      - name: توليد android إن لم يكن موجوداً
-        working-directory: app
+      - name: Create Android platform if missing
         run: |
           if [ ! -d "android" ]; then
-            flutter create --platforms=android --org com.dalini --project-name dalini_aqsa .
+            flutter create --platforms=android --org com.dalni . || flutter create --platforms=android .
           fi
 
-      - name: تسمية التطبيق "دليني"
-        working-directory: app
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Update AndroidManifest.xml
         run: |
           MANIFEST="android/app/src/main/AndroidManifest.xml"
-          sed -i 's/android:label="[^"]*"/android:label="دليني"/g' "$MANIFEST"
-          echo "📄 label:"
-          grep 'android:label' "$MANIFEST"
-
-      - name: تحديث Kotlin إلى 2.0.0
-        working-directory: app
-        run: |
-          if [ -f android/settings.gradle ]; then
-            sed -i "s/id \"org.jetbrains.kotlin.android\" version \"[^\"]*\"/id \"org.jetbrains.kotlin.android\" version \"2.0.0\"/g" android/settings.gradle
-          fi
-          if [ -f android/build.gradle ]; then
-            sed -i "s/ext.kotlin_version = '[^']*'/ext.kotlin_version = '2.0.0'/g" android/build.gradle
-          fi
-
-      - name: ترقية Android Gradle Plugin وGradle Wrapper (مطلوبة لدعم compileSdk 35)
-        working-directory: app
-        run: |
-          # القالب الافتراضي لفلاتر 3.24 يستخدم AGP 7.3.0 وGradle 7.6.3، وهما إصداران
-          # قديمان جداً ولا يدعمان compileSdk 35 (يسبب فشل AAPT2 عند البناء).
-          # نرفعهما إلى الحد الأدنى الموصى به رسمياً لدعم compileSdk 35 دون كسر Kotlin 2.0.0.
-          if [ -f android/settings.gradle ]; then
-            sed -i "s/id \"com.android.application\" version \"[^\"]*\"/id \"com.android.application\" version \"8.6.0\"/g" android/settings.gradle
-            echo "📄 settings.gradle بعد الترقية:"
-            grep 'version' android/settings.gradle
-          fi
-
-          GRADLE_WRAPPER="android/gradle/wrapper/gradle-wrapper.properties"
-          if [ -f "$GRADLE_WRAPPER" ]; then
-            # نستبدل رقم إصدار Gradle فقط للحفاظ على تنسيق الملف (بما في ذلك \: المُهرَّب)
-            sed -i -E "s/gradle-[0-9]+(\.[0-9]+)*-all\.zip/gradle-8.7-all.zip/" "$GRADLE_WRAPPER"
-            echo "📄 gradle-wrapper.properties بعد الترقية:"
-            cat "$GRADLE_WRAPPER"
-          fi
-
-      - name: إضافة صلاحيات INTERNET + الإشعارات + الكاميرا
-        working-directory: app
-        run: |
-          MANIFEST="android/app/src/main/AndroidManifest.xml"
-          echo "📄 المحتوى الأصلي:"
-          cat "$MANIFEST"
-          echo ""
-          if ! grep -q "android.permission.INTERNET" "$MANIFEST"; then
-            sed -i 's|<application|<uses-permission android:name="android.permission.INTERNET"/>\n    <application|' "$MANIFEST"
-            echo "✅ تمت إضافة INTERNET"
-          fi
-          if ! grep -q "POST_NOTIFICATIONS" "$MANIFEST"; then
-            sed -i 's|<application|<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n    <application|' "$MANIFEST"
-            echo "✅ تمت إضافة POST_NOTIFICATIONS"
-          fi
-          if ! grep -q "SCHEDULE_EXACT_ALARM" "$MANIFEST"; then
-            sed -i 's|<application|<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>\n    <application|' "$MANIFEST"
-            echo "✅ تمت إضافة SCHEDULE_EXACT_ALARM"
-          fi
-          if ! grep -q "android.permission.CAMERA" "$MANIFEST"; then
-            sed -i 's|<application|<uses-permission android:name="android.permission.CAMERA"/>\n    <application|' "$MANIFEST"
-            echo "✅ تمت إضافة CAMERA"
-          fi
-          echo ""
-          echo "📄 بعد التعديل:"
-          cat "$MANIFEST"
-
-      - name: إضافة queries للواتساب (Android 11+)
-        working-directory: app
-        run: |
-          MANIFEST="android/app/src/main/AndroidManifest.xml"
-          if ! grep -q "<queries>" "$MANIFEST"; then
-            sed -i 's|<application|<queries>\n        <package android:name="com.whatsapp"/>\n        <package android:name="com.whatsapp.w4b"/>\n        <intent>\n            <action android:name="android.intent.action.VIEW"/>\n            <data android:scheme="https"/>\n        </intent>\n    </queries>\n    <application|' "$MANIFEST"
-            echo "✅ تمت إضافة queries"
-          else
-            echo "ℹ️ queries موجودة"
-          fi
-
-      - name: تحليل الكود
-        working-directory: app
-        run: flutter analyze --no-fatal-infos || true
-
-      - name: تحديث إصدار Android SDK إلى 35
-        working-directory: app
-        run: |
-          python3 << 'PYSCRIPT'
+          if [ -f "$MANIFEST" ]; then
+            python3 - <<'EOF'
           import re
-          gradle_file = 'android/app/build.gradle'
-           
-          with open(gradle_file, 'r') as f:
+          path = "android/app/src/main/AndroidManifest.xml"
+          with open(path, "r", encoding="utf-8") as f:
               content = f.read()
-           
-          # تحديث compileSdk/targetSdk/minSdk إلى القيم المطلوبة.
-          # ملاحظة مهمة: قوالب Flutter 3.24+ لا تستخدم الصيغة القديمة
-          # "compileSdkVersion 34" بل صيغة إسناد الخاصية الحديثة
-          # "compileSdk = flutter.compileSdkVersion"، لذلك يجب أن يدعم
-          # الـ regex كلا الصيغتين (القديمة والحديثة) وإلا يبقى التحديث
-          # بلا أي أثر فعلي على قيمة compileSdk الحقيقية.
-          content = re.sub(r'(compileSdk(?:Version)?\s*=?\s*)\S+', r'\g<1>35', content)
-          content = re.sub(r'(targetSdk(?:Version)?\s*=?\s*)\S+', r'\g<1>35', content)
-          content = re.sub(r'(minSdk(?:Version)?\s*=?\s*)\S+', r'\g<1>21', content)
 
-          # تفعيل Core Library Desugaring: مكتبة flutter_local_notifications
-          # تفرض على أي تطبيق يستخدمها تفعيل coreLibraryDesugaringEnabled
-          # وإضافة تبعية desugar_jdk_libs، وإلا يفشل البناء بخطأ
-          # "requires core library desugaring to be enabled for :app"
-          if 'coreLibraryDesugaringEnabled' not in content:
-              if re.search(r'compileOptions\s*\{', content):
-                  content = re.sub(
-                      r'(compileOptions\s*\{)',
-                      r'\1\n        coreLibraryDesugaringEnabled true',
-                      content,
-                      count=1
-                  )
-              else:
-                  content = re.sub(
-                      r'(android\s*\{)',
-                      r'\1\n    compileOptions {\n        coreLibraryDesugaringEnabled true\n    }',
-                      content,
-                      count=1
-                  )
+          permissions = [
+              '<uses-permission android:name="android.permission.INTERNET"/>',
+              '<uses-permission android:name="android.permission.CAMERA"/>',
+              '<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>',
+          ]
 
-          if 'coreLibraryDesugaring ' not in content:
-              if re.search(r'dependencies\s*\{', content):
-                  content = re.sub(
-                      r'(dependencies\s*\{)',
-                      r"\1\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'",
-                      content,
-                      count=1
-                  )
-              else:
-                  content = content.rstrip() + "\n\ndependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'\n}\n"
-           
-          with open(gradle_file, 'w') as f:
+          for perm in permissions:
+              if perm not in content:
+                  content = re.sub(r'(<manifest[^>]*>)', r'\1\n    ' + perm, content, count=1)
+
+          content = re.sub(r'android:label="[^"]*"', 'android:label="دلني الأقصى"', content)
+
+          with open(path, "w", encoding="utf-8") as f:
               f.write(content)
-           
-          print("✅ تم تحديث إصدارات Android SDK إلى 35 وتفعيل Core Library Desugaring")
-          PYSCRIPT
+          EOF
+          fi
 
-      - name: تثبيت Android SDK 35
+      - name: Decode Keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          # البحث الآمن عن sdkmanager بغضّ النظر عن مساره (cmdline-tools/latest أو أي إصدار آخر)
-          SDKMAN=$(find "$ANDROID_HOME" -name sdkmanager -type f 2>/dev/null | head -1)
-
-          if [ -z "$SDKMAN" ]; then
-            echo "❌ لم يتم العثور على sdkmanager داخل $ANDROID_HOME"
-            find "$ANDROID_HOME" -maxdepth 4
-            exit 1
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > android/app/keystore.jks
           fi
 
-          echo "📦 استخدام sdkmanager: $SDKMAN"
-
-          yes | "$SDKMAN" --licenses > /dev/null || true
-          "$SDKMAN" "platforms;android-35" "build-tools;35.0.0"
-
-          echo "🔍 التحقق من التثبيت:"
-          ls "$ANDROID_HOME/platforms/android-35/android.jar"
-          ls "$ANDROID_HOME/build-tools/35.0.0/"
-
-      - name: توليد أيقونات التطبيق
-        working-directory: app
-        run: dart run flutter_launcher_icons
-
-      - name: إعداد التوقيع (APK Signing)
-        working-directory: app
-        if: env.HAS_KEYSTORE == 'true'
+      - name: Configure signing
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          # فك تشفير الـ keystore من Base64 إلى ملف
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/dalini.jks
-           
-          # التحقق من الملف
-          if [ -f "android/app/dalini.jks" ]; then
-            echo "✅ تم إنشاء ملف التوقيع بنجاح"
-            ls -lh android/app/dalini.jks
-          else
-            echo "❌ فشل إنشاء ملف التوقيع"
-            exit 1
-          fi
-
-          # التحقق من أن الملف غير فارغ (فشل صامت محتمل في فك تشفير الـ Secret)
-          KEYSTORE_SIZE=$(wc -c < android/app/dalini.jks)
-          echo "📏 حجم ملف dalini.jks: ${KEYSTORE_SIZE} bytes"
-          if [ "$KEYSTORE_SIZE" -eq 0 ]; then
-            echo "❌ ملف dalini.jks فارغ (0 بايت) — تحقق من صحة قيمة الـ Secret KEYSTORE_BASE64"
-            exit 1
-          fi
-           
-          # إنشاء ملف key.properties
-          cat > android/key.properties << EOF
-          storeFile=dalini.jks
-          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
+          if [ -f "android/app/keystore.jks" ]; then
+            cat > android/key.properties <<EOF
+          storePassword=${KEYSTORE_PASSWORD}
+          keyPassword=${KEY_PASSWORD}
+          keyAlias=${KEY_ALIAS}
+          storeFile=keystore.jks
           EOF
 
-          # التحقق من إنشاء key.properties
-          [ -f "android/key.properties" ] && echo "✅ تم إنشاء key.properties" || exit 1
-           
-          # إضافة التوقيع إلى build.gradle (يعتمد على key.properties)
-          python3 << 'PYSCRIPT'
-          import re
-           
-          gradle_file = 'android/app/build.gradle'
-          with open(gradle_file, 'r') as f:
+            BUILD_GRADLE="android/app/build.gradle"
+            if [ ! -f "$BUILD_GRADLE" ]; then
+              BUILD_GRADLE="android/app/build.gradle.kts"
+            fi
+
+            python3 - <<'EOF'
+          import os, re
+          path = "android/app/build.gradle"
+          if not os.path.exists(path):
+              path = "android/app/build.gradle.kts"
+
+          with open(path, "r", encoding="utf-8") as f:
               content = f.read()
-           
-          # تحميل خصائص التوقيع من key.properties
-          keystore_loader = '''def keystoreProperties = new Properties()
-          def keystorePropertiesFile = rootProject.file('key.properties')
-          if (keystorePropertiesFile.exists()) {
-              keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
-          }
 
-          '''
-          # مهم جداً: قوالب Flutter الحديثة (3.24+) تبدأ الملف بكتلة
-          # "plugins {}"، وGradle يمنع وجود أي كود قبلها عدا
-          # buildscript {} / pluginManagement {} / plugins {} أخرى.
-          # لذلك يجب إدراج keystore_loader بعد نهاية كتلة plugins {}
-          # مباشرة، وليس في بداية الملف كما كان سابقاً (وهذا بالتحديد
-          # سبب فشل البناء بخطأ "line 7: only buildscript {},
-          # pluginManagement {} and other plugins {} ... are allowed").
-          if 'keystoreProperties' not in content:
-              plugins_match = re.search(r'plugins\s*\{[^}]*\}', content)
-              if plugins_match:
-                  insert_pos = plugins_match.end()
-                  content = content[:insert_pos] + '\n\n' + keystore_loader + content[insert_pos:]
+          if "key.properties" not in content:
+              if path.endswith(".kts"):
+                  content = (
+                      'import java.util.Properties\n'
+                      'import java.io.FileInputStream\n\n'
+                      'val keystoreProperties = Properties()\n'
+                      'val keystorePropertiesFile = rootProject.file("key.properties")\n'
+                      'if (keystorePropertiesFile.exists()) {\n'
+                      '    keystoreProperties.load(FileInputStream(keystorePropertiesFile))\n'
+                      '}\n\n'
+                  ) + content
+                  content = content.replace(
+                      "buildTypes {",
+                      'signingConfigs {\n'
+                      '    create("release") {\n'
+                      '        keyAlias = keystoreProperties["keyAlias"] as String\n'
+                      '        keyPassword = keystoreProperties["keyPassword"] as String\n'
+                      '        storeFile = keystoreProperties["storeFile"]?.let { file(it) }\n'
+                      '        storePassword = keystoreProperties["storePassword"] as String\n'
+                      '    }\n'
+                      '}\n'
+                      'buildTypes {'
+                  )
+                  content = content.replace(
+                      'getByName("release") {',
+                      'getByName("release") {\n            signingConfig = signingConfigs.getByName("release")'
+                  )
               else:
-                  # نمط قديم بدون plugins {} في أعلى الملف - يمكن الإدراج في البداية بأمان
-                  content = keystore_loader + content
-           
-          # إضافة signingConfigs بعد android {
-          signing_config = '''signingConfigs {
-              release {
-                  if (keystorePropertiesFile.exists()) {
-                      keyAlias keystoreProperties['keyAlias']
-                      keyPassword keystoreProperties['keyPassword']
-                      storeFile file(keystoreProperties['storeFile'])
-                      storePassword keystoreProperties['storePassword']
-                  }
-              }
-          }
-          '''
-          # لا تستخدم "signingConfigs" كمعيار للفحص لأن القالب الافتراضي
-          # يحتوي على "signingConfigs.debug" مسبقاً داخل buildTypes.release
-          if 'signingConfigs {' not in content:
-              content = re.sub(
-                  r'android\s*\{',
-                  'android {\n    ' + signing_config.strip(),
-                  content,
-                  count=1
-              )
-           
-          # تحديث buildTypes.release لاستخدام signingConfigs.release
-          # يدعم كلا الصيغتين: "signingConfig signingConfigs.debug" (قديمة)
-          # و"signingConfig = signingConfigs.debug" (حديثة، قوالب Flutter 3.24+).
-          # بدون هذا الدعم، السطر القديم يبقى كما هو (لأن الفحص النصي القديم
-          # لا يطابق صيغة "=")، وبما أنه يُنفَّذ بعد السطر الجديد المُضاف،
-          # يبقى التوقيع الفعلي على مفتاح debug رغم إضافة signingConfigs.release
-          debug_signing_pattern = re.compile(r'signingConfig\s*=?\s*signingConfigs\.debug')
-          release_signing_pattern = re.compile(r'signingConfig\s*=?\s*signingConfigs\.release')
+                  content = (
+                      "def keystoreProperties = new Properties()\n"
+                      "def keystorePropertiesFile = rootProject.file('key.properties')\n"
+                      "if (keystorePropertiesFile.exists()) {\n"
+                      "    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))\n"
+                      "}\n\n"
+                  ) + content
+                  content = content.replace(
+                      "buildTypes {",
+                      "signingConfigs {\n"
+                      "    release {\n"
+                      "        keyAlias keystoreProperties['keyAlias']\n"
+                      "        keyPassword keystoreProperties['keyPassword']\n"
+                      "        storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null\n"
+                      "        storePassword keystoreProperties['storePassword']\n"
+                      "    }\n"
+                      "}\n"
+                      "buildTypes {"
+                  )
+                  content = content.replace(
+                      "release {",
+                      "release {\n            signingConfig signingConfigs.release"
+                  )
 
-          if debug_signing_pattern.search(content):
-              # القالب الافتراضي لـFlutter يوقّع الإصدار release بمفتاح debug
-              content = debug_signing_pattern.sub('signingConfig signingConfigs.release', content)
-          elif not release_signing_pattern.search(content):
-              content = re.sub(
-                  r'(buildTypes\s*\{\s*release\s*\{)',
-                  r'\1\n            signingConfig signingConfigs.release',
-                  content,
-                  count=1
-              )
-           
-          with open(gradle_file, 'w') as f:
+          with open(path, "w", encoding="utf-8") as f:
               f.write(content)
-           
-          print("✅ تم إضافة التوقيع إلى build.gradle")
-          PYSCRIPT
+          EOF
+          fi
 
-      - name: التحقق من ملف التوقيع قبل البناء
-        working-directory: app
-        if: env.HAS_KEYSTORE == 'true'
-        run: |
-          echo "🔍 التحقق من وجود ملف التوقيع قبل البناء:"
-          ls -la android/app/dalini.jks || exit 1
-          echo "---"
-          echo "📄 محتوى key.properties:"
-          cat android/key.properties
-          echo "---"
-          echo "📁 محتويات android/:"
-          ls -la android/
+      - name: Build Release APK
+        run: flutter build apk --release
 
-      - name: بناء APK (مع التوقيع)
-        working-directory: app
-        run: |
-          flutter build apk --release \
-            --dart-define=API_URL=${{ github.event.inputs.api_url || 'https://dalini-aqsa-gv2p.onrender.com' }}
-
-      - name: رفع APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: dalini-aqsa-apk
-          path: app/build/app/outputs/flutter-apk/app-release.apk
-          retention-days: 30
+          name: release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
