@@ -5,12 +5,16 @@ const crypto = require('crypto');
 const util = require('util');
 const { sendEmail, gateway } = require('./mailer');
 const { createStore } = require('./store');
+const fs = require('fs');
+const pathMod = require('path');
 
 const scrypt = util.promisify(crypto.scrypt);
 const PORT = Number(process.env.PORT) || 10000;
 const PROD = process.env.NODE_ENV === 'production';
 const RESET_DEMO = process.env.RESET_DEMO_MODE === 'true' && !PROD;
 const CODE_SECRET = process.env.CODE_SECRET || 'dev-only-secret-change-me';
+const ADMIN_EMAIL = String(process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+const ADMIN_HTML = (() => { try { return fs.readFileSync(pathMod.join(__dirname, 'admin.html'), 'utf8'); } catch (e) { return '<h1>Admin missing</h1>'; } })();
 const SESSION_MS = 30 * 24 * 3600 * 1000;
 const RESET_MIN = 10;
 const store = createStore();
@@ -94,6 +98,12 @@ const auth = async (c) => {
 };
 const only = (role) => async (c) => {
   if (c.user.role !== role) { c.fail(403, 'هذه العملية غير متاحة لحسابك'); return true; }
+  return false;
+};
+
+const adminOnly = async (c) => {
+  if (!ADMIN_EMAIL) { c.fail(503, 'الإدارة معطّلة'); return true; }
+  if (String(c.user.email || '').toLowerCase() !== ADMIN_EMAIL) { c.fail(403, 'غير مسموح'); return true; }
   return false;
 };
 
@@ -385,6 +395,31 @@ route('POST', '/api/providers/me/verify', [auth, only('provider')], async (c) =>
   const upd = await store.upsertSub(c.user.id, { verify_status: 'pending' });
   return c.json(200, { subscription: upd, message: 'تم إرسال طلب التوثيق — سيراجعه الفريق' });
 });
+
+// ---------- الإدارة ----------
+route('GET', '/api/admin/subscriptions', [auth, adminOnly], async (c) => {
+  const list = await store.pendingVerifications(); const out = [];
+  for (const s of list) { const u = await store.userById(s.user_id); out.push({ user_id: s.user_id, name: u ? u.name : 'مجهول', email: u ? u.email : '', plan: s.plan, verify_status: s.verify_status, updated_at: s.updated_at || null }); }
+  return c.json(200, { pending: out });
+});
+
+route('POST', '/api/admin/verify/:userId', [auth, adminOnly], async (c) => {
+  const uid = String(c.params.userId || '');
+  if (!ID_RX.test(uid)) return c.fail(400, 'معرّف خطأ');
+  const u = await store.userById(uid);
+  if (!u) return c.fail(404, 'غير موجود');
+  const upd = await store.upsertSub(uid, { verified: true, verify_status: 'approved' });
+  return c.json(200, { subscription: upd });
+});
+
+route('POST', '/api/admin/reject/:userId', [auth, adminOnly], async (c) => {
+  const uid = String(c.params.userId || '');
+  if (!ID_RX.test(uid)) return c.fail(400, 'معرّف خطأ');
+  const upd = await store.upsertSub(uid, { verified: false, verify_status: 'rejected' });
+  return c.json(200, { subscription: upd });
+});
+
+route('GET', '/admin', [], (c) => { c.res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); c.res.end(ADMIN_HTML); });
 
 // ---------- الخادم ----------
 // الحد الأقصى لحجم جسم الطلب: 3 ميغابايت (يكفي لصورة واحدة بصيغة base64 مع بيانات الطلب).

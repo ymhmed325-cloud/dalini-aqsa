@@ -172,6 +172,9 @@ function memoryStore() {
       for (const id of ids) { const s = subs.get(id); out[id] = s ? s.verified : false; }
       return out;
     },
+    async pendingVerifications() {
+      return [...subs.values()].filter((x) => x.verify_status === 'pending').map((x) => ({ ...x }));
+    },
     async addEvent(rid, status, actor, note) { events.push({ request_id: rid, status, actor, note: note || '', created_at: now() }); },
     async eventsFor(rid) { return events.filter((e) => e.request_id === rid).map(({ status, actor, note, created_at }) => ({ status, actor, note, created_at })); },
   };
@@ -287,6 +290,9 @@ function pgStore(url) {
       const out = {};
       for (const x of r.rows) out[x.user_id] = true;
       return out;
+    },
+    async pendingVerifications() {
+      return (await q("SELECT * FROM aq_subscriptions WHERE verify_status = 'pending' ORDER BY updated_at DESC LIMIT 100")).rows.map(SUB);
     },
     async addEvent(rid, status, actor, note) { await q('INSERT INTO aq_events (request_id,status,actor,note) VALUES ($1,$2,$3,$4)', [rid, status, actor, note || '']); },
     async eventsFor(rid) {
