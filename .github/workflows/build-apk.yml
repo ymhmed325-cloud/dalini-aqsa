@@ -109,6 +109,17 @@ jobs:
           echo "📄 بعد التعديل:"
           cat "$MANIFEST"
 
+      - name: إضافة queries للواتساب (Android 11+)
+        working-directory: app
+        run: |
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          if ! grep -q "<queries>" "$MANIFEST"; then
+            sed -i 's|<application|<queries>\n        <package android:name="com.whatsapp"/>\n        <package android:name="com.whatsapp.w4b"/>\n        <intent>\n            <action android:name="android.intent.action.VIEW"/>\n            <data android:scheme="https"/>\n        </intent>\n    </queries>\n    <application|' "$MANIFEST"
+            echo "✅ تمت إضافة queries"
+          else
+            echo "ℹ️ queries موجودة"
+          fi
+
       - name: تحليل الكود
         working-directory: app
         run: flutter analyze --no-fatal-infos || true
