@@ -1,0 +1,19 @@
+<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>Admin</title>
+<style>body{font-family:sans-serif;background:#F5F7FA;padding:20px;color:#1A2733}.c{max-width:800px;margin:auto}.card{background:#fff;border-radius:16px;padding:20px;margin-bottom:16px;box-shadow:0 4px 16px rgba(27,58,92,.08)}input,button{font-size:15px;padding:12px 16px;border-radius:12px;border:1px solid #ddd;width:100%;box-sizing:border-box}button{background:#1B3A5C;color:#fff;border:none;font-weight:700;margin-top:10px;cursor:pointer}.row{display:flex;justify-content:space-between;padding:14px 0;border-bottom:1px solid #eee;gap:10px;flex-wrap:wrap}.ok{background:#2E9E5B;width:auto;padding:8px 20px}.no{background:#C0392B;width:auto;padding:8px 20px}.m{color:#6B7C8A;text-align:center;padding:20px}</style></head>
+<body><div class="c"><h1>لوحة الإدارة - دليني</h1>
+<div id="l" class="card"><input id="t" type="password" placeholder="الصق التوكن"><button onclick="go()">دخول</button></div>
+<div id="p" style="display:none"><div class="card"><div id="ls"><p class="m">جاري التحميل...</p></div></div></div>
+</div>
+<script>
+let k=localStorage.getItem('k')||'';
+function e(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+async function api(p,m){const r=await fetch(p,{method:m||'GET',headers:{'Content-Type':'application/json','Authorization':'Bearer '+k}});return{ok:r.ok,status:r.status,d:await r.json().catch(()=>({}))}}
+async function load(){document.getElementById('p').style.display='block';document.getElementById('l').style.display='none';
+const r=await api('/api/admin/subscriptions');if(!r.ok){if([401,403,503].includes(r.status)){out();alert(r.d.error||'غير مسموح');return}document.getElementById('ls').innerHTML='<p class="m">خطأ</p>';return}
+const x=r.d.pending||[];if(!x.length){document.getElementById('ls').innerHTML='<p class="m">لا توجد طلبات</p>';return}
+document.getElementById('ls').innerHTML=x.map(i=>`<div class="row"><div><b>${e(i.name)}</b><br><small>${e(i.email)} · ${e(i.plan)}</small></div><div><button class="ok" onclick="a('${e(i.user_id)}','verify')">موافقة</button> <button class="no" onclick="a('${e(i.user_id)}','reject')">رفض</button></div></div>`).join('')}
+async function a(u,z){const r=await api('/api/admin/'+z+'/'+u,'POST');if(!r.ok){alert(r.d.error||'خطأ');return}load()}
+function go(){k=document.getElementById('t').value.trim();if(!k)return;localStorage.setItem('k',k);load()}
+function out(){k='';localStorage.removeItem('k');document.getElementById('p').style.display='none';document.getElementById('l').style.display='block'}
+if(k)load();
+</script></body></html>

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'theme.dart';
 import 'api.dart';
 import 'widgets.dart';
+import 'payment_screen.dart';
 
 class UpgradeScreen extends StatefulWidget {
   const UpgradeScreen({super.key});
@@ -39,16 +40,11 @@ class _UpgradeScreenState extends State<UpgradeScreen> {
   }
 
   Future<void> _subscribe(String planId) async {
-    setState(() => busyPlan = planId);
-    final r = await Api.post('/api/providers/me/subscribe', <String, dynamic>{'plan': planId});
-    if (!mounted) return;
-    setState(() => busyPlan = null);
-    if (!r.ok) {
-      showAqSnack(context, r.error ?? 'تعذر تفعيل الباقة', error: true);
-      return;
-    }
-    showAqSnack(context, s(r.map['message'], 'تم تفعيل الباقة'));
-    _load();
+    final plan = plans.firstWhere((p) => s(p['id']) == planId, orElse: () => plans.first);
+    await Navigator.of(context).push(fadeRoute<void>(PaymentScreen(
+      planName: s(plan['name'], planId),
+      planPrice: (plan['price'] as int?) ?? 0,
+    )));
   }
 
   Future<void> _verify() async {
